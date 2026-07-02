@@ -1,0 +1,39 @@
+--- Query: all:"video conferencing" AND all:"machine learning" ---
+Title: qAttCNN - Self Attention Mechanism for Video QoE Prediction in Encrypted Traffic
+Date: 2026-01-11T11:08:40Z
+Summary: The rapid growth of multimedia consumption, driven by major advances in mobile devices since the mid-2000s, has led to widespread use of video conferencing applications (VCAs) such as Zoom and Google Meet, as well as instant messaging applications (IMAs) like WhatsApp and Telegram, which increasingl...
+
+Title: REFA: Real-time Egocentric Facial Animations for Virtual Reality
+Date: 2026-01-07T01:41:46Z
+Summary: We present a novel system for real-time tracking of facial expressions using egocentric views captured from a set of infrared cameras embedded in a virtual reality (VR) headset. Our technology facilitates any user to accurately drive the facial expressions of virtual characters in a non-intrusive ma...
+
+Title: SmartSecChain-SDN: A Blockchain-Integrated Intelligent Framework for Secure and Efficient Software-Defined Networks
+Date: 2025-11-07T11:22:04Z
+Summary: With more and more existing networks being transformed to Software-Defined Networking (SDN), they need to be more secure and demand smarter ways of traffic control. This work, SmartSecChain-SDN, is a platform that combines machine learning based intrusion detection, blockchain-based storage of logs,...
+
+--- Query: all:"WebRTC" AND all:"machine learning" ---
+Title: Rethink Web Service Resilience in Space: A Radiation-Aware and Sustainable Transmission Solution
+Date: 2026-03-19T06:15:30Z
+Summary: Low Earth Orbit (LEO) satellite networks such as Starlink and Project Kuiper are increasingly integrated with cloud infrastructures, forming an important internet backbone for global web services. By extending connectivity to remote regions, oceans, and disaster zones, these networks enable reliable...
+
+Title: qAttCNN - Self Attention Mechanism for Video QoE Prediction in Encrypted Traffic
+Date: 2026-01-11T11:08:40Z
+Summary: The rapid growth of multimedia consumption, driven by major advances in mobile devices since the mid-2000s, has led to widespread use of video conferencing applications (VCAs) such as Zoom and Google Meet, as well as instant messaging applications (IMAs) like WhatsApp and Telegram, which increasingl...
+
+Title: Estimating WebRTC Video QoE Metrics Without Using Application Headers
+Date: 2023-06-01T23:16:54Z
+Summary: The increased use of video conferencing applications (VCAs) has made it critical to understand and support end-user quality of experience (QoE) by all stakeholders in the VCA ecosystem, especially network operators, who typically do not have direct access to client software. Existing VCA QoE estimat...
+
+--- Query: all:"deepfake detection" AND all:"video call" ---
+Title: DeepFake Detection in Dyadic Video Calls using Point of Gaze Tracking
+Date: 2025-09-29T20:59:31Z
+Summary: With recent advancements in deepfake technology, it is now possible to generate convincing deepfakes in real-time. Unfortunately, malicious actors have started to use this new technology to perform real-time phishing attacks during video meetings. The nature of a video call allows access to what the...
+
+Title: Shaking the Fake: Detecting Deepfake Videos in Real Time via Active Probes
+Date: 2024-09-17T04:58:30Z
+Summary: Real-time deepfake, a type of generative AI, is capable of "creating" non-existing contents (e.g., swapping one's face with another) in a video. It has been, very unfortunately, misused to produce deepfake videos (during web conferences, video calls, and identity authentication) for malicious purpos...
+
+Title: Lips Are Lying: Spotting the Temporal Inconsistency between Audio and Visual in Lip-Syncing DeepFakes
+Date: 2024-01-28T14:22:11Z
+Summary: In recent years, DeepFake technology has achieved unprecedented success in high-quality video synthesis, but these methods also pose potential and severe security threats to humanity. DeepFake can be bifurcated into entertainment applications like face swapping and illicit uses such as lip-syncing f...
+

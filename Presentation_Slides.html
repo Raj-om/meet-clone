@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Online Video Meeting – A Step Towards Atma Nirbhar Bharat | Slides</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:"Poppins",sans-serif;background:#0a0a1a;overflow:hidden;height:100vh;width:100vw;}
+.deck{width:100vw;height:100vh;position:relative;}
+.slide{position:absolute;inset:0;display:none;flex-direction:column;opacity:0;transition:opacity 0.5s;}
+.slide.active{display:flex;opacity:1;}
+.nav{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:12px;z-index:100;background:rgba(255,255,255,0.07);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.13);border-radius:50px;padding:8px 20px;}
+.nav button{background:none;border:none;color:#fff;font-size:16px;cursor:pointer;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:background 0.2s;}
+.nav button:hover{background:rgba(255,255,255,0.2);}
+.dots{display:flex;gap:6px;}
+.dot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,0.25);cursor:pointer;transition:all 0.3s;}
+.dot.active{background:#fff;transform:scale(1.3);}
+#sc{color:rgba(255,255,255,0.5);font-size:11px;min-width:42px;text-align:center;}
+.keyhint{position:fixed;top:14px;right:20px;font-size:10px;color:rgba(255,255,255,0.25);letter-spacing:1px;}
+/* S1 FRONT */
+#s1{background:linear-gradient(135deg,#0f0c29,#302b63,#24243e);justify-content:center;align-items:center;text-align:center;padding:36px;}
+#s1 .badge{background:linear-gradient(90deg,#f7971e,#ffd200);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-size:11px;font-weight:700;letter-spacing:4px;text-transform:uppercase;margin-bottom:12px;}
+#s1 .sub{color:rgba(255,255,255,0.5);font-size:11.5px;margin-bottom:22px;}
+#s1 h1{font-size:clamp(20px,3.2vw,40px);font-weight:800;color:#fff;line-height:1.25;max-width:800px;margin:0 auto 6px auto;}
+#s1 h1 span{display:block;font-size:clamp(13px,1.8vw,20px);font-weight:400;color:rgba(255,255,255,0.5);margin-top:6px;letter-spacing:1px;}
+.div{width:70px;height:3px;background:linear-gradient(90deg,#f7971e,#ffd200);border-radius:3px;margin:20px auto;}
+.gbox{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:12px 24px;margin-bottom:20px;display:inline-block;}
+.glbl{font-size:9px;color:rgba(255,255,255,0.4);letter-spacing:2px;text-transform:uppercase;}
+.gnm{font-size:15px;font-weight:600;color:#ffd200;}
+.team{display:flex;flex-wrap:wrap;justify-content:center;gap:9px;max-width:680px;margin:0 auto;}
+.mb{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.09);border-radius:9px;padding:8px 14px;font-size:12px;color:#fff;}
+.mb .usn{display:block;font-size:10px;color:rgba(255,255,255,0.4);margin-top:1px;}
+/* SHARED */
+.si{flex:1;display:flex;flex-direction:column;padding:40px 56px 80px 56px;overflow:hidden;}
+.sl{font-size:10px;font-weight:700;letter-spacing:4px;text-transform:uppercase;margin-bottom:6px;}
+.st{font-size:clamp(20px,2.8vw,34px);font-weight:800;color:#fff;border-left:5px solid;padding-left:14px;margin-bottom:22px;line-height:1.2;}
+.sc2{flex:1;overflow:hidden;}
+/* S2 */
+#s2{background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460);}
+.toc-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px;}
+.ti{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);border-radius:11px;padding:12px 16px;display:flex;align-items:center;gap:12px;}
+.tn{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:#fff;flex-shrink:0;}
+.tt{font-size:13px;color:#e0e0e0;font-weight:500;}
+/* S3 */
+#s3{background:linear-gradient(135deg,#0d2137,#1a3a5c,#0d2137);}
+.abox{background:rgba(0,210,255,0.05);border:1px solid rgba(0,210,255,0.13);border-radius:14px;padding:20px 24px;height:calc(100% - 8px);overflow:auto;}
+.abox p{font-size:13px;color:rgba(255,255,255,0.83);line-height:1.82;margin-bottom:10px;}
+.kwr{display:flex;flex-wrap:wrap;gap:7px;margin-top:14px;}
+.kw{background:rgba(0,210,255,0.1);border:1px solid rgba(0,210,255,0.25);border-radius:20px;padding:3px 11px;font-size:11px;color:#00d2ff;font-weight:600;}
+/* S4 */
+#s4{background:linear-gradient(135deg,#1a1014,#2d1b2e,#1a102b);}
+.ip{background:rgba(255,255,255,0.04);border-radius:12px;padding:14px 18px;font-size:12.5px;color:rgba(255,255,255,0.79);line-height:1.78;margin-bottom:14px;}
+.ic3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+.ic{background:rgba(168,85,247,0.07);border:1px solid rgba(168,85,247,0.16);border-radius:13px;padding:16px 14px;text-align:center;}
+.ic .ii{font-size:28px;margin-bottom:8px;}
+.ic h3{font-size:12px;font-weight:700;color:#fff;margin-bottom:5px;}
+.ic p{font-size:11px;color:rgba(255,255,255,0.55);line-height:1.55;}
+/* S5 */
+#s5{background:linear-gradient(135deg,#0a1628,#142850,#0a2342);}
+.ol{display:flex;flex-direction:column;gap:9px;}
+.oi{background:rgba(34,197,94,0.05);border:1px solid rgba(34,197,94,0.13);border-radius:11px;padding:11px 16px;display:flex;align-items:flex-start;gap:11px;}
+.ob{width:26px;height:26px;border-radius:50%;background:#22c55e;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;color:#fff;font-weight:700;margin-top:1px;}
+.ot{font-size:12px;color:rgba(255,255,255,0.83);line-height:1.58;}
+/* S6 */
+#s6{background:linear-gradient(135deg,#1a0a0a,#2d1515,#1a0a0a);}
+.pm{background:rgba(239,68,68,0.07);border:1px solid rgba(239,68,68,0.18);border-radius:13px;padding:16px 20px;margin-bottom:12px;font-size:13px;color:#fff;line-height:1.78;}
+.pg{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.pc{background:rgba(255,255,255,0.03);border:1px solid rgba(239,68,68,0.1);border-radius:11px;padding:12px 14px;display:flex;gap:10px;align-items:flex-start;}
+.pi{font-size:20px;flex-shrink:0;}
+.pd{font-size:11px;color:rgba(255,255,255,0.72);line-height:1.6;}
+.pd strong{color:#fca5a5;display:block;margin-bottom:2px;font-size:11.5px;}
+/* S7 */
+#s7{background:linear-gradient(135deg,#0a1a0a,#0d2b0d,#0a1a0a);}
+.lw{overflow:auto;border-radius:10px;max-height:55vh;}
+#s7 table{width:100%;border-collapse:collapse;font-size:10px;}
+#s7 thead tr{background:linear-gradient(90deg,#78350f,#b45309);}
+#s7 thead th{padding:9px 8px;color:#fff;font-weight:700;text-align:center;border:1px solid rgba(245,158,11,0.2);white-space:nowrap;font-size:10.5px;}
+#s7 tbody tr:nth-child(even){background:rgba(255,255,255,0.025);}
+#s7 tbody tr:hover{background:rgba(245,158,11,0.05);}
+#s7 tbody td{padding:7px 9px;color:rgba(255,255,255,0.8);border:1px solid rgba(255,255,255,0.06);vertical-align:top;line-height:1.45;}
+#s7 tbody td:first-child{color:#fcd34d;font-weight:600;white-space:nowrap;}
+#s7 tbody td:last-child{color:#86efac;font-weight:600;font-size:10px;}
+/* S8 */
+#s8{background:linear-gradient(135deg,#0f1923,#1a2d44,#0f1923);}
+.cp{display:flex;flex-direction:column;gap:10px;margin-bottom:14px;}
+.ci{background:rgba(56,189,248,0.05);border:1px solid rgba(56,189,248,0.13);border-radius:11px;padding:11px 16px;display:flex;gap:12px;align-items:flex-start;}
+.cico{font-size:18px;flex-shrink:0;}
+.ct{font-size:12px;color:rgba(255,255,255,0.83);line-height:1.6;}
+.fb{background:rgba(56,189,248,0.07);border:1px solid rgba(56,189,248,0.18);border-radius:11px;padding:12px 18px;}
+.fb h4{font-size:11px;font-weight:700;color:#38bdf8;margin-bottom:7px;letter-spacing:1px;}
+.fb ul{list-style:none;display:flex;flex-wrap:wrap;gap:6px;}
+.fb li{background:rgba(56,189,248,0.09);border:1px solid rgba(56,189,248,0.22);border-radius:20px;padding:3px 11px;font-size:10.5px;color:#7dd3fc;}
+/* S9 */
+#s9{background:linear-gradient(135deg,#12101e,#1e1a36,#12101e);}
+.rl{display:flex;flex-direction:column;gap:8px;overflow-y:auto;max-height:calc(100vh - 200px);}
+.ri{background:rgba(192,132,252,0.04);border:1px solid rgba(192,132,252,0.1);border-radius:9px;padding:9px 14px;display:flex;gap:11px;align-items:flex-start;}
+.rn{background:rgba(192,132,252,0.13);border:1px solid rgba(192,132,252,0.28);border-radius:5px;padding:2px 7px;font-size:10.5px;font-weight:700;color:#c084fc;flex-shrink:0;white-space:nowrap;margin-top:1px;}
+.rt{font-size:11px;color:rgba(255,255,255,0.72);line-height:1.55;}
+.rt em{color:#a78bfa;}
+</style>
+</head>
+<body>
+<div class="keyhint">← → ARROW KEYS</div>
+<div class="deck">
+<!-- SLIDE 1 -->
+<div class="slide active" id="s1">
+  <div class="badge">Mini Project Presentation &middot; Phase 1 &middot; 2025&ndash;26</div>
+  <div class="sub">Visvesvaraya Technological University, Belagavi &nbsp;|&nbsp; Dept. of AI &amp; ML &nbsp;|&nbsp; Govt. Engineering College, Challakere</div>
+  <h1>Online Video Meeting<span>&mdash; A Step Towards Atma Nirbhar Bharat &mdash;</span></h1>
+  <div class="div"></div>
+  <div class="gbox">
+    <div class="glbl">Project Guide</div>
+    <div class="gnm">Mrs. Rajalakshmi N</div>
+    <div style="font-size:11px;color:rgba(255,255,255,0.38);margin-top:2px;">Assistant Professor, Dept. of AI &amp; ML</div>
+  </div>
+  <div class="team">
+    <div class="mb">C B Fatina Sulthana<span class="usn">4EG23AI011</span></div>
+    <div class="mb">Raj Sekhar Parhi<span class="usn">4EG23AI038</span></div>
+    <div class="mb">Sinchana B<span class="usn">4EG23AI043</span></div>
+    <div class="mb">Sushrutha S<span class="usn">4EG23AI046</span></div>
+  </div>
+</div>
+<!-- SLIDE 2 -->
+<div class="slide" id="s2">
+  <div class="si">
+    <div class="sl" style="color:#e94560;">02</div>
+    <div class="st" style="border-color:#e94560;">Table of Contents</div>
+    <div class="sc2"><div class="toc-grid">
+      <div class="ti"><div class="tn" style="background:#e94560;">1</div><div class="tt">Abstract</div></div>
+      <div class="ti"><div class="tn" style="background:#a855f7;">2</div><div class="tt">Introduction</div></div>
+      <div class="ti"><div class="tn" style="background:#22c55e;">3</div><div class="tt">Objectives</div></div>
+      <div class="ti"><div class="tn" style="background:#ef4444;">4</div><div class="tt">Problem Statement</div></div>
+      <div class="ti"><div class="tn" style="background:#f59e0b;">5</div><div class="tt">Literature Survey</div></div>
+      <div class="ti"><div class="tn" style="background:#38bdf8;">6</div><div class="tt">Conclusion</div></div>
+      <div class="ti"><div class="tn" style="background:#c084fc;">7</div><div class="tt">Bibliography</div></div>
+    </div></div>
+  </div>
+</div>
+<!-- SLIDE 3 -->
+<div class="slide" id="s3">
+  <div class="si">
+    <div class="sl" style="color:#00d2ff;">03</div>
+    <div class="st" style="border-color:#00d2ff;">Abstract</div>
+    <div class="sc2"><div class="abox">
+      <p>In alignment with India&rsquo;s vision of <strong>Atma Nirbhar Bharat</strong>, this project presents a fully indigenous, browser-native, AI-powered video conferencing platform built using open-source technologies, eliminating dependency on foreign services like Google Meet or Zoom.</p>
+      <p>The platform uses <strong>Next.js 16, React 19, WebRTC</strong>, and a custom Node.js + Socket.IO signalling server. It integrates a <strong>Random Forest-based scam detection engine</strong> fusing six signals; a <strong>frequency-domain audio deepfake detector</strong> using spectral flatness and ZCR variance; a <strong>Lucas-Kanade optical flow engine</strong> for puppet-master detection; and a <strong>Python-Flask DIRE microservice</strong> using DCT power-spectrum analysis for AI-generated video detection.</p>
+      <p>Beyond security, the platform provides live captions, collaborative whiteboard, breakout rooms, polls, virtual background, noise cancellation, and malicious link / QR-code safety detection &mdash; all without any third-party cloud dependency.</p>
+      <div class="kwr"><span class="kw">WebRTC</span><span class="kw">Deepfake Detection</span><span class="kw">Voice Clone Detection</span><span class="kw">Random Forest</span><span class="kw">Atma Nirbhar Bharat</span><span class="kw">Optical Flow</span><span class="kw">DIRE</span></div>
+    </div></div>
+  </div>
+</div>
+<!-- SLIDE 4 -->
+<div class="slide" id="s4">
+  <div class="si">
+    <div class="sl" style="color:#a855f7;">04</div>
+    <div class="st" style="border-color:#a855f7;">Introduction</div>
+    <div class="sc2" style="overflow:auto;">
+      <div class="ip">Video conferencing has transformed education, healthcare, governance, and business in India. The COVID-19 pandemic accelerated reliance on foreign platforms — creating data sovereignty risks. In the spirit of <strong>Atma Nirbhar Bharat</strong>, there is a critical need for a secure, intelligent, and self-reliant video communication platform developed and hosted within India.</div>
+      <div class="ic3">
+        <div class="ic"><div class="ii">🌐</div><h3>WebRTC Technology</h3><p>Peer-to-peer encrypted video and audio without central media servers. Native browser support — no plugins.</p></div>
+        <div class="ic"><div class="ii">🛡️</div><h3>AI-Powered Security</h3><p>Real-time deepfake, voice clone, and scam detection using TensorFlow.js and ONNX Runtime in the browser.</p></div>
+        <div class="ic"><div class="ii">🇮🇳</div><h3>Atma Nirbhar Vision</h3><p>100% open-source stack. No dependency on Google, Zoom, or AWS. Data stays within the Indian network.</p></div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- SLIDE 5 -->
+<div class="slide" id="s5">
+  <div class="si">
+    <div class="sl" style="color:#22c55e;">05</div>
+    <div class="st" style="border-color:#22c55e;">Objectives</div>
+    <div class="sc2" style="overflow:auto;"><div class="ol">
+      <div class="oi"><div class="ob">1</div><div class="ot">Design and implement a full-featured, browser-native, P2P video conferencing platform using WebRTC and Next.js — without any third-party media server.</div></div>
+      <div class="oi"><div class="ob">2</div><div class="ot">Integrate a real-time multi-signal <strong>scam detection engine</strong> powered by a custom Random Forest classifier fusing six independent detection signals.</div></div>
+      <div class="oi"><div class="ob">3</div><div class="ot">Implement <strong>audio deepfake (voice clone) detection</strong> using spectral flatness, noise floor, and zero-crossing-rate variance via the Web Audio API.</div></div>
+      <div class="oi"><div class="ob">4</div><div class="ot">Implement <strong>video deepfake detection</strong> using MesoNet-4 ONNX browser inference and a pixel-heuristic fallback for face-swap and GAN artefacts.</div></div>
+      <div class="oi"><div class="ob">5</div><div class="ot">Develop a <strong>Python-Flask DIRE microservice</strong> using DCT power-spectrum analysis and ResNet-50 for AI-generated video frame detection.</div></div>
+      <div class="oi"><div class="ob">6</div><div class="ot">Implement an <strong>AI Bitrate Optimiser</strong> using a pre-trained Random Forest ensemble to adapt video quality based on real-time WebRTC network statistics.</div></div>
+      <div class="oi"><div class="ob">7</div><div class="ot">Provide a complete feature set: captions, whiteboard, breakout rooms, polls, virtual background, QR scanning, and malicious link detection.</div></div>
+    </div></div>
+  </div>
+</div>
+<!-- SLIDE 6 -->
+<div class="slide" id="s6">
+  <div class="si">
+    <div class="sl" style="color:#ef4444;">06</div>
+    <div class="st" style="border-color:#ef4444;">Problem Statement</div>
+    <div class="sc2" style="overflow:auto;">
+      <div class="pm">Existing video conferencing platforms offer <strong>no real-time protection</strong> against deepfake impersonation, voice cloning, and scam attacks. Indian users are exposed to <strong>data sovereignty risks</strong> as audio-visual data is processed on foreign servers. Meanwhile, <strong>network-adaptive quality</strong> relies on slow, static congestion control unsuitable for India's variable connectivity.</div>
+      <div class="pg">
+        <div class="pc"><div class="pi">🎭</div><div class="pd"><strong>Deepfake Impersonation</strong>AI face-swap and voice-clone tools used to impersonate officials during video calls to extort money.</div></div>
+        <div class="pc"><div class="pi">🔒</div><div class="pd"><strong>Data Sovereignty</strong>Indian citizens' video and audio data processed on US-based servers without India's data protection compliance.</div></div>
+        <div class="pc"><div class="pi">📡</div><div class="pd"><strong>Poor Adaptive Quality</strong>Static bitrate algorithms cannot respond to India's congested last-mile networks causing poor call quality.</div></div>
+        <div class="pc"><div class="pi">🔗</div><div class="pd"><strong>Malicious Content</strong>Phishing links and malicious QR codes shared during screen sharing go undetected by current platforms.</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- SLIDE 7 -->
+<div class="slide" id="s7">
+  <div class="si" style="padding:32px 44px 80px 44px;">
+    <div class="sl" style="color:#f59e0b;">07</div>
+    <div class="st" style="border-color:#f59e0b;margin-bottom:14px;">Literature Survey</div>
+    <div class="sc2"><div class="lw">
+      <table><thead><tr>
+        <th>Author &amp; Year</th><th>Title / Topic</th><th>Methodology</th><th>Key Finding</th><th>Limitation</th><th>Relevance</th><th>Presenter</th>
+      </tr></thead><tbody>
+        <tr><td>Afchar et al. (2018)</td><td>MesoNet: Facial Video Forgery Detection</td><td>4-layer CNN; FaceForensics; 256x256</td><td>98% accuracy on face-swap deepfakes</td><td>Fails on unseen GAN models</td><td>MesoNet-4 ONNX used in browser inference</td><td>Fatina</td></tr>
+        <tr><td>Wang et al. (2023)</td><td>DIRE: Diffusion-Generated Image Detection</td><td>Diffusion reconstruction error + ResNet-50</td><td>Cross-generator generalisation</td><td>High compute; not real-time without GPU</td><td>DCT heuristic from DIRE in Flask microservice</td><td>Raj</td></tr>
+        <tr><td>Ojha et al. (2023)</td><td>Universal Fake Image Detection</td><td>CLIP features + linear probe; spectral stats</td><td>Generator-agnostic without retraining</td><td>Requires CLIP; high memory footprint</td><td>Colour statistics in DIRE microservice</td><td>Sinchana</td></tr>
+        <tr><td>Yi et al. (2022)</td><td>ADD 2022: Audio Deep Synthesis Detection</td><td>LFCC + ECAPA-TDNN for TTS/VC detection</td><td>EER 3.2% on VITS, Tacotron cloners</td><td>Server-side; high latency</td><td>Spectral flatness &amp; noise floor in audio hook</td><td>Sushrutha</td></tr>
+        <tr><td>Guera &amp; Delp (2018)</td><td>Deepfake Video Detection using RNNs</td><td>Optical flow + C3D + LSTM</td><td>97% accuracy; temporal analysis outperforms frame-level</td><td>LSTM latency not suitable for live stream</td><td>Block-matching optical flow in browser</td><td>Fatina</td></tr>
+        <tr><td>Rossler et al. (2019)</td><td>FaceForensics++ Benchmark</td><td>1000 videos, 5 manipulation types, HQ/LQ</td><td>Temporal superior for HQ deepfakes</td><td>No diffusion-model fakes in dataset</td><td>Validated 30-frame rolling window design</td><td>Raj</td></tr>
+        <tr><td>Mao et al. (2017)</td><td>Pensieve: Adaptive Bitrate Algorithms</td><td>RL ABR using RTT, loss, buffer</td><td>25% QoE improvement over MPC/BOLA</td><td>RL requires expensive online training</td><td>RF bitrate optimiser inspired by Pensieve</td><td>Sinchana</td></tr>
+        <tr><td>Muller et al. (2022)</td><td>Does Audio Deepfake Detection Generalise?</td><td>ZCR variance + pitch analysis</td><td>ZCR variance separates human vs. synthetic</td><td>Only English TTS validated</td><td>computePitchRegularity() in audio hook</td><td>Sushrutha</td></tr>
+        <tr><td>Corvi et al. (2023)</td><td>Detection of Diffusion Model Images</td><td>DCT/Fourier frequency peak analysis</td><td>Identifies spatial periodic patterns in diffusion</td><td>Susceptible to heavy video compression</td><td>DCT power spectrum in DIRE microservice</td><td>Fatina &amp; Raj</td></tr>
+        <tr><td>WebRTC Group (2021)</td><td>WebRTC 1.0 Standardization</td><td>API protocol for ICE, STUN/TURN, DTLS</td><td>Enables low-latency secure P2P media</td><td>Requires robust signalling layer implementation</td><td>Core communication infrastructure of the project</td><td>Sinchana &amp; Sushrutha</td></tr>
+        <tr><td>Govt. of India (2020)</td><td>Atma Nirbhar Bharat Abhiyan</td><td>National initiative for technological self-reliance</td><td>Demands sovereign digital infrastructure</td><td>N/A (Policy Directive)</td><td>Core motivation for 100% indigenous platform</td><td>All</td></tr>
+      </tbody></table>
+    </div></div>
+  </div>
+</div>
+<!-- SLIDE 8 -->
+<div class="slide" id="s8">
+  <div class="si">
+    <div class="sl" style="color:#38bdf8;">08</div>
+    <div class="st" style="border-color:#38bdf8;">Conclusion</div>
+    <div class="sc2" style="overflow:auto;">
+      <div class="cp">
+        <div class="ci"><div class="cico">&#9989;</div><div class="ct">Successfully built a fully indigenous, browser-native video conferencing platform aligned with <strong>Atma Nirbhar Bharat</strong> — eliminating dependence on foreign services.</div></div>
+        <div class="ci"><div class="cico">&#129302;</div><div class="ct">A <strong>multi-signal Random Forest ensemble</strong> effectively fuses six AI signals (deepfake, voice, facial, background, behavioural, keyword) into a reliable, low-latency composite risk score.</div></div>
+        <div class="ci"><div class="cico">&#127897;&#65039;</div><div class="ct"><strong>Frequency-domain audio features</strong> (spectral flatness, ZCR variance, noise floor) via the Web Audio API detect voice-clone artefacts in real time without any server-side model.</div></div>
+        <div class="ci"><div class="cico">&#128225;</div><div class="ct">A <strong>pre-trained Random Forest bitrate optimiser</strong> reading live WebRTC statistics adapts video quality faster than static congestion control for Indian network conditions.</div></div>
+      </div>
+      <div class="fb"><h4>FUTURE SCOPE</h4><ul>
+        <li>Streaming LSTM for temporal deepfake analysis</li>
+        <li>On-device speaker verification (ECAPA-TDNN via TF.js)</li>
+        <li>Kannada / Hindi scam keyword detection</li>
+        <li>Curriculum-aware RAG for Exam Mode</li>
+        <li>Indian-hosted TURN servers for full data sovereignty</li>
+      </ul></div>
+    </div>
+  </div>
+</div>
+<!-- SLIDE 9 -->
+<div class="slide" id="s9">
+  <div class="si">
+    <div class="sl" style="color:#c084fc;">09</div>
+    <div class="st" style="border-color:#c084fc;">Bibliography</div>
+    <div class="sc2"><div class="rl">
+      <div class="ri"><div class="rn">[1]</div><div class="rt">D. Afchar et al., <em>"MesoNet: a Compact Facial Video Forgery Detection Network,"</em> IEEE WIFS, 2018.</div></div>
+      <div class="ri"><div class="rn">[2]</div><div class="rt">J. Wang et al., <em>"DIRE for Diffusion-Generated Image Detection,"</em> IEEE/CVF ICCV, 2023.</div></div>
+      <div class="ri"><div class="rn">[3]</div><div class="rt">U. Ojha et al., <em>"Towards Universal Fake Image Detection Exploiting Vision Foundation Models,"</em> CVPR, 2023.</div></div>
+      <div class="ri"><div class="rn">[4]</div><div class="rt">X. Yi et al., <em>"ADD 2022: The First Audio Deep Synthesis Detection Challenge,"</em> ICASSP, IEEE, 2022.</div></div>
+      <div class="ri"><div class="rn">[5]</div><div class="rt">D. Guera and E. J. Delp, <em>"Deepfake Video Detection Using Recurrent Neural Networks,"</em> IEEE AVSS, 2018.</div></div>
+      <div class="ri"><div class="rn">[6]</div><div class="rt">A. Rossler et al., <em>"FaceForensics++: Learning to Detect Manipulated Facial Images,"</em> ICCV, 2019.</div></div>
+      <div class="ri"><div class="rn">[7]</div><div class="rt">H. Mao, R. Netravali, M. Alizadeh, <em>"Real-World Performance of Adaptive Bitrate Algorithms,"</em> ACM IMC, 2017.</div></div>
+      <div class="ri"><div class="rn">[8]</div><div class="rt">N. Muller et al., <em>"Does Audio Deepfake Detection Generalise?"</em> Interspeech, 2022.</div></div>
+      <div class="ri"><div class="rn">[9]</div><div class="rt">V. Corvi et al., <em>"On The Detection of Synthetic Images Generated by Diffusion Models,"</em> ICASSP, 2023.</div></div>
+      <div class="ri"><div class="rn">[10]</div><div class="rt">WebRTC Working Group, <em>"WebRTC 1.0: Real-Time Communication Between Browsers,"</em> W3C Recommendation, 2021.</div></div>
+      <div class="ri"><div class="rn">[11]</div><div class="rt">Government of India, <em>"Atma Nirbhar Bharat Abhiyan,"</em> Press Information Bureau, Ministry of Finance, 2020.</div></div>
+    </div></div>
+  </div>
+</div>
+</div><!-- /deck -->
+<div class="nav">
+  <button onclick="changeSlide(-1)">&#8592;</button>
+  <div class="dots" id="dots"></div>
+  <button onclick="changeSlide(1)">&#8594;</button>
+  <div id="sc">1 / 9</div>
+</div>
+<script>
+const slides=document.querySelectorAll('.slide');
+const dc=document.getElementById('dots');
+const sc=document.getElementById('sc');
+let cur=0;
+slides.forEach((_,i)=>{const d=document.createElement('div');d.className='dot'+(i===0?' active':'');d.onclick=()=>goTo(i);dc.appendChild(d);});
+function goTo(n){slides[cur].classList.remove('active');document.querySelectorAll('.dot')[cur].classList.remove('active');cur=(n+slides.length)%slides.length;slides[cur].classList.add('active');document.querySelectorAll('.dot')[cur].classList.add('active');sc.textContent=(cur+1)+' / '+slides.length;}
+function changeSlide(d){goTo(cur+d);}
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'||e.key==='ArrowDown')changeSlide(1);if(e.key==='ArrowLeft'||e.key==='ArrowUp')changeSlide(-1);});
+</script>
+</body>
+</html>

@@ -1,0 +1,112 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  accounts      Account[]
+  sessions      Session[]
+  hostedMeetings Meeting[]
+}
+
+model Account {
+  id                 String  @id @default(cuid())
+  userId             String
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String?
+  access_token       String?
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String?
+  session_state      String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Meeting {
+  id          String   @id @default(cuid())
+  roomId      String   @unique
+  title       String
+  hostId      String
+  scheduledAt DateTime
+  passcode    String?
+  createdAt   DateTime @default(now())
+  host        User     @relation(fields: [hostId], references: [id], onDelete: Cascade)
+
+  // Relation to store metrics linked to this meeting
+  examResults          ExamResult[]
+  interviewResults     InterviewResult[]
+  classroomEngagements ClassroomEngagement[]
+}
+
+model ExamResult {
+  id             String   @id @default(cuid())
+  meetingId      String
+  studentId      String
+  studentName    String
+  score          Float?
+  plagiarismRisk Float?
+  violations     String?  // JSON string of violations array
+  submittedAt    DateTime @default(now())
+
+  meeting Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+}
+
+model InterviewResult {
+  id              String   @id @default(cuid())
+  meetingId       String
+  candidateId     String
+  candidateName   String
+  confidenceScore Float
+  eyeContact      Float
+  voiceStress     Float
+  speakingTimeMs  Int
+  flags           String?  // JSON string of flags array
+  createdAt       DateTime @default(now())
+
+  meeting Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+}
+
+model ClassroomEngagement {
+  id              String   @id @default(cuid())
+  meetingId       String
+  studentId       String
+  studentName     String
+  averageScore    Float
+  attendanceTime  Int      // minutes attended
+  joinedAt        DateTime
+  disconnectedAt  DateTime?
+
+  meeting Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+}
