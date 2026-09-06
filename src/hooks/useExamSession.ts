@@ -22,7 +22,7 @@ export interface StudentViolation {
     studentId: string
     displayName: string
     timestamp: number
-    type: 'tab_switch' | 'second_face' | 'phone_detected' | 'left_frame' | 'eye_movement' | 'fullscreen_exit'
+    type: 'tab_switch' | 'second_face' | 'phone_detected' | 'left_frame' | 'eye_movement' | 'fullscreen_exit' | 'hidden_ai_copilot'
     description: string
 }
 

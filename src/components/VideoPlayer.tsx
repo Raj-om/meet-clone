@@ -53,11 +53,13 @@ const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(
                     width: "100%",
                     height: "100%",
                     overflow: "hidden",
-                    borderRadius: "12px",
-                    backgroundColor: "#303134",
-                    boxShadow: isActiveSpeaker ? "0 0 0 3px #1a73e8, 0 0 20px rgba(26,115,232,0.5)" : "var(--shadow-md)",
-                    border: isActiveSpeaker ? "2px solid #1a73e8" : `2px solid ${borderColor}`,
-                    transition: "border-color 0.4s ease, box-shadow 0.4s ease",
+                    borderRadius: "16px",
+                    boxSizing: "border-box",
+                    backgroundColor: "rgba(10, 10, 15, 0.8)",
+                    backdropFilter: "blur(12px)",
+                    boxShadow: isActiveSpeaker ? "0 0 0 2px #8b5cf6, 0 0 35px rgba(139,92,246,0.5)" : "inset 0 0 0 1px rgba(255,255,255,0.05), 0 10px 30px rgba(0,0,0,0.6)",
+                    border: isActiveSpeaker ? "2px solid #a78bfa" : `2px solid ${borderColor}`,
+                    transition: "all 0.4s cubic-bezier(0.2, 0, 0, 1)",
                 }}
             >
                 <video
@@ -114,18 +116,52 @@ const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(
                     </div>
                 )}
 
-                {/* Participant label + network quality */}
+                {/* Top right badges */}
+                <div style={{ position: "absolute", top: "12px", right: "12px", display: "flex", flexDirection: "column", gap: "6px", alignItems: "flex-end" }}>
+                    {deepfakeLabel && (
+                        <div style={{
+                            background: badgeColor,
+                            color: deepfakeLabel === "Real" ? "#000" : "white",
+                            padding: "4px 10px",
+                            borderRadius: "8px",
+                            fontSize: "11px",
+                            fontWeight: 800,
+                            letterSpacing: "0.5px",
+                            textTransform: "uppercase",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "6px",
+                            boxShadow: `0 4px 15px ${badgeColor}60`,
+                            border: `1px solid rgba(255,255,255,0.2)`
+                        }}>
+                            {badgeIcon} {deepfakeLabel}
+                        </div>
+                    )}
+                </div>
+
+                {/* Bottom left info overlay */}
                 <div style={{
-                    position: "absolute", bottom: "12px", left: "12px",
-                    backgroundColor: "rgba(0,0,0,0.6)",
-                    padding: "4px 8px", borderRadius: "4px",
-                    color: "white", fontSize: "0.85rem", fontWeight: 500,
-                    display: "flex", alignItems: "center", gap: "6px"
+                    position: "absolute",
+                    bottom: "12px",
+                    left: "12px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    background: "rgba(15, 23, 42, 0.6)",
+                    backdropFilter: "blur(12px)",
+                    padding: "6px 12px",
+                    borderRadius: "10px",
+                    color: "white",
+                    fontSize: "13px",
+                    fontWeight: 600,
+                    letterSpacing: "0.3px",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                    boxShadow: "0 4px 15px rgba(0,0,0,0.3)"
                 }}>
                     {networkQuality && (
                         <span
                             className="net-quality-dot"
-                            style={{ background: qualityColor(networkQuality) }}
+                            style={{ background: qualityColor(networkQuality), width: "8px", height: "8px", borderRadius: "50%" }}
                             title={`Network: ${networkQuality}`}
                         />
                     )}

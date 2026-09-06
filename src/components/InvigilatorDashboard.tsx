@@ -77,6 +77,7 @@ function violationIcon(type: StudentViolation['type']): string {
         left_frame:      "👤",
         eye_movement:    "👁️",
         fullscreen_exit: "⛶",
+        hidden_ai_copilot: "🤖",
     }
     return map[type] ?? "⚠️"
 }

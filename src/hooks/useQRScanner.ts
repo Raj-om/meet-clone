@@ -60,7 +60,9 @@ export function useQRScanner({ videoRef, enabled, onQRDetected }: UseQRScannerOp
                 if (code.data.startsWith("http://") || code.data.startsWith("https://")) {
                     lastUrlRef.current = code.data
                     setLastDetectedQR(code.data)
-                    onQRDetected(code.data)
+                    if (onQRRef.current) {
+                        onQRRef.current(code.data)
+                    }
                 }
             }
         } catch (e) {
@@ -69,9 +71,11 @@ export function useQRScanner({ videoRef, enabled, onQRDetected }: UseQRScannerOp
             setIsScanning(false)
             setScanCount(c => c + 1)
         }
-    }, [videoRef, enabled, onQRDetected])
+    }, [videoRef, enabled])
 
     const activeRef = useRef(false)
+    const onQRRef = useRef(onQRDetected)
+    useEffect(() => { onQRRef.current = onQRDetected }, [onQRDetected])
 
     useEffect(() => {
         if (!enabled) {

@@ -3,9 +3,14 @@
 import { useEffect, useRef, useCallback, useState } from "react"
 import { ScamSignal } from "./useScamDetection"
 
-// Lazy load TF.js + CocoSSD to avoid SSR & bundle bloat
+import * as tf from "@tensorflow/tfjs"
+import "@tensorflow/tfjs-backend-webgl"
+import "@tensorflow/tfjs-backend-cpu"
+import * as cocoSsd from "@tensorflow-models/coco-ssd"
+
+// Lazy load state
 let cocoSsdLoaded = false
-let detector: import("@tensorflow-models/coco-ssd").ObjectDetection | null = null
+let detector: cocoSsd.ObjectDetection | null = null
 
 // Objects that indicate cheating in an exam context
 const CHEATING_OBJECTS = new Set([
@@ -57,10 +62,8 @@ async function loadDetector() {
     cocoSsdLoaded = true
     try {
         // Load TF.js with WebGL backend for GPU acceleration
-        const tf = await import("@tensorflow/tfjs")
         await tf.setBackend("webgl")
         await tf.ready()
-        const cocoSsd = await import("@tensorflow-models/coco-ssd")
         detector = await cocoSsd.load({ base: "mobilenet_v2" })
     } catch (e) {
         console.warn("[useObjectDetection] Failed to load model:", e)

@@ -1,24 +1,22 @@
 {
-  "name": "Meet Clone AI",
-  "short_name": "Meet Clone",
-  "description": "Secure, AI-powered Video Conferencing with Deepfake Detection",
+  "name": "Meet App",
+  "short_name": "Meet",
+  "description": "Secure, AI-powered meeting platform",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#000000",
-  "theme_color": "#7c3aed",
-  "orientation": "any",
+  "background_color": "#09090b",
+  "theme_color": "#09090b",
+  "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "/icon512_maskable.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
+      "src": "/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
     },
     {
-      "src": "/icon512_rounded.png",
+      "src": "/icon-512x512.png",
       "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
+      "type": "image/png"
     }
   ]
 }

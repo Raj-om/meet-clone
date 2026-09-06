@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState, useCallback } from "react"
 import { io } from "socket.io-client"
-import { Room, RoomEvent, createLocalVideoTrack, createLocalAudioTrack, Track, LocalVideoTrack, LocalAudioTrack } from "livekit-client"
+import { Room, RoomEvent, Track, LocalVideoTrack, LocalAudioTrack } from "livekit-client"
+import { cameraManager } from "@/utils/cameraManager"
 
 // This hook replaces the old Socket.io P2P system with LiveKit SFU,
 // but perfectly preserves the old MediaStream interfaces so the AI/Deepfake models do not break!
@@ -41,26 +42,35 @@ export const useWebRTC = (roomId: string, userId: string) => {
                 await room.connect(livekitUrl, token)
 
                 // 3. Setup Local Media Streams
-                const stream = new MediaStream()
-                
-                try {
-                    const videoTrack = await createLocalVideoTrack({ facingMode: "user" })
-                    await room.localParticipant.publishTrack(videoTrack)
-                    if (videoTrack.mediaStreamTrack) stream.addTrack(videoTrack.mediaStreamTrack)
-                } catch (e) {
-                    console.warn("Failed to acquire video (Camera may be missing or blocked):", e)
-                }
+                const isCompanion = sessionStorage.getItem("meet-companion-mode") === "true";
 
-                try {
-                    const audioTrack = await createLocalAudioTrack({ echoCancellation: true, noiseSuppression: true })
-                    await room.localParticipant.publishTrack(audioTrack)
-                    if (audioTrack.mediaStreamTrack) stream.addTrack(audioTrack.mediaStreamTrack)
-                } catch (e) {
-                    console.warn("Failed to acquire audio (Microphone may be missing or blocked):", e)
-                }
-                
-                if (stream.getTracks().length > 0 && isMounted) {
-                    setLocalStream(stream)
+                if (!isCompanion) {
+                    const stream = await cameraManager.getStream();
+                    
+                    try {
+                        const videoTracks = stream.getVideoTracks();
+                        if (videoTracks.length > 0) {
+                            await room.localParticipant.publishTrack(videoTracks[0]);
+                        }
+                    } catch (e) {
+                        console.warn("Failed to publish video track:", e);
+                    }
+
+                    try {
+                        const audioTracks = stream.getAudioTracks();
+                        if (audioTracks.length > 0) {
+                            await room.localParticipant.publishTrack(audioTracks[0]);
+                        }
+                    } catch (e) {
+                        console.warn("Failed to publish audio track:", e);
+                    }
+                    
+                    if (stream.getTracks().length > 0 && isMounted) {
+                        setLocalStream(stream);
+                    }
+                } else {
+                    // Provide empty stream for Companion mode to prevent null errors in UI
+                    if (isMounted) setLocalStream(new MediaStream());
                 }
 
                 // 4. Map Remote LiveKit Tracks back into standard MediaStreams for the AI Models

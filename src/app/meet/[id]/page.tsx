@@ -23,6 +23,9 @@ import { useLSTMBehavior } from "@/hooks/useLSTMBehavior"
 import { useWhisperTranscription } from "@/hooks/useWhisperTranscription"
 import { useSileroVAD } from "@/hooks/useSileroVAD"
 import { useEngagementScore } from "@/hooks/useEngagementScore"
+import { useCameraAlgorithms } from "@/hooks/useCameraAlgorithms"
+import { cameraManager } from "@/utils/cameraManager"
+import { generateVTT, generateMarkdownNotes, GlobalCaption } from "@/utils/transcriptionPipeline"
 // ── Components ───────────────────────────────────────────────────────────────
 import VideoPlayer from "@/components/VideoPlayer"
 import NotificationManager from "@/components/NotificationManager"
@@ -36,6 +39,7 @@ import SettingsModal from "@/components/SettingsModal"
 import MeetingInfoModal from "@/components/MeetingInfoModal"
 import Whiteboard from "@/components/Whiteboard"
 import PollsPanel from "@/components/PollsPanel"
+import QnAPanel from "@/components/QnAPanel"
 import BreakoutRoomsPanel from "@/components/BreakoutRoomsPanel"
 import MeetingSummaryModal from "@/components/MeetingSummaryModal"
 import EngagementPanel from "@/components/EngagementPanel"
@@ -52,7 +56,7 @@ import { useActiveSpeaker } from "@/hooks/useActiveSpeaker"
 import { useNetworkQuality } from "@/hooks/useNetworkQuality"
 import { useNoiseCancellation } from "@/hooks/useNoiseCancellation"
 import { useVirtualBackground } from "@/hooks/useVirtualBackground"
-import { useAIBitrateOptimizer } from "@/hooks/useAIBitrateOptimizer"
+import { useArenaNetwork } from "@/hooks/useArenaNetwork"
 import { useAttendanceSystem } from "@/hooks/useAttendanceSystem"
 import AttendancePanel from "@/components/AttendancePanel"
 import { useAITutorServer } from "@/hooks/useAITutorServer"
@@ -60,8 +64,9 @@ import AITutorPanel from "@/components/AITutorPanel"
 import { useRouter } from "next/navigation"
 import { ErrorBoundary } from "@/components/ErrorBoundary"
 import { useNervousSystem } from "@/hooks/useNervousSystem"
+import { useOptimalGrid } from "@/hooks/useOptimalGrid"
 
-type SidebarTab = 'scam' | 'notify' | 'graph' | 'chat' | 'participants' | 'polls' | 'breakout' | 'exam' | 'engagement' | 'classroom' | 'interview' | 'exam_panel' | 'attendance' | 'tutor'
+type SidebarTab = 'scam' | 'notify' | 'graph' | 'chat' | 'participants' | 'polls' | 'breakout' | 'exam' | 'engagement' | 'classroom' | 'interview' | 'exam_panel' | 'attendance' | 'tutor' | 'qna'
 type RoomMode = 'office' | 'classroom' | 'interview' | 'exam' | null
 type LayoutMode = 'grid' | 'spotlight'
 
@@ -112,13 +117,19 @@ export default function MeetingPage({ params }: { params: Promise<{ id: string }
     const noiseGatedStream = noiseReduction
         ? (sileroVAD.processedStream || legacyNoiseStream)
         : null
+
+    const cameraAlgosStream = useCameraAlgorithms(noiseGatedStream || localStream, {
+        autoFraming: aiOptimizationEnabled,
+        lowLightEnhancement: aiOptimizationEnabled
+    })
+
     const { outputStream: bgStream } = useVirtualBackground(
-        noiseGatedStream || localStream,
+        cameraAlgosStream || noiseGatedStream || localStream,
         bgMode !== "none",
         bgMode,
         "https://images.unsplash.com/photo-1541701494587-cb58502866ab?q=80&w=1000&auto=format&fit=crop"
     )
-    const finalLocalStream = bgStream || noiseGatedStream || localStream
+    const finalLocalStream = bgStream || cameraAlgosStream || noiseGatedStream || localStream
 
 
     useEffect(() => {
@@ -135,7 +146,22 @@ export default function MeetingPage({ params }: { params: Promise<{ id: string }
     // ── Network & Speaker ────────────────────────────────────────────────────
     const networkQualities = useNetworkQuality(peersRef)
     const activeSpeakerId = useActiveSpeaker(peersRef, finalLocalStream, userId)
-    const { optimalBitrate } = useAIBitrateOptimizer(peersRef, aiOptimizationEnabled)
+    // ── Host Detection (Server-Authoritative) ─────────────────────────────────
+    // isHost is now confirmed by the SERVER via the "host-confirmed" socket event.
+    // Clients can NOT fake host status by editing sessionStorage or DevTools.
+    // We seed from sessionStorage only as a UX hint before the socket confirms.
+    const [isHost, setIsHost] = useState<boolean>(() => {
+        if (typeof window === 'undefined') return false
+        return sessionStorage.getItem(`meet-host-${meetingId}`) === 'true'
+    })
+
+    // ── ARENA: AI-Powered Adaptive Real-time Ensemble Network Architecture ─────
+    const { arenaState, congestionProb, isArenaActive } = useArenaNetwork({
+        peersRef,
+        enabled: aiOptimizationEnabled,
+        contextSignals: [],   // populated via engagement data in production
+        hostPeerIds: isHost ? new Set([userId]) : new Set()
+    })
 
     // ── UI State ─────────────────────────────────────────────────────────────
     const [isMuted, setIsMuted] = useState(false)
@@ -160,13 +186,18 @@ export default function MeetingPage({ params }: { params: Promise<{ id: string }
     const [floatingReactions, setFloatingReactions] = useState<{ id: string; emoji: string; x: number }[]>([])
 
     // ── Recording ─────────────────────────────────────────────────────────────
+    // ── Recording ─────────────────────────────────────────────────────────────
     const [isRecording, setIsRecording] = useState(false)
     const mediaRecorderRef = useRef<MediaRecorder | null>(null)
     const recordedChunksRef = useRef<BlobPart[]>([])
+    const recordingStartTimeRef = useRef<number | null>(null)
+    const globalTranscriptRef = useRef<GlobalCaption[]>([])
 
     // ── Local video ref ───────────────────────────────────────────────────────
     const localVideoRef = useRef<HTMLVideoElement>(null)
     const containerRef = useRef<HTMLDivElement>(null)
+    const videoGridContainerRef = useRef<HTMLDivElement>(null)
+    const gridDimensions = useOptimalGrid(videoGridContainerRef, 1 + Object.keys(remoteStreams).length, 16/9, 12)
 
     // ── AI Active Defense Option Selector ─────────────────────────────────────
     const [aiOptions, setAiOptions] = useState({
@@ -183,14 +214,8 @@ export default function MeetingPage({ params }: { params: Promise<{ id: string }
 
 
 
-    // ── Host Detection (Server-Authoritative) ─────────────────────────────────
-    // isHost is now confirmed by the SERVER via the "host-confirmed" socket event.
-    // Clients can NOT fake host status by editing sessionStorage or DevTools.
-    // We seed from sessionStorage only as a UX hint before the socket confirms.
-    const [isHost, setIsHost] = useState<boolean>(() => {
-        if (typeof window === 'undefined') return false
-        return sessionStorage.getItem(`meet-host-${meetingId}`) === 'true'
-    })
+    // ── Host Detection ────────────────────────────────────────────────────────
+
     // Also track remote participants' engagement scores (sent by server relay)
     const [remoteEngagements, setRemoteEngagements] = useState<Map<string, {
         userId: string; displayName: string; score: number;
@@ -201,23 +226,29 @@ export default function MeetingPage({ params }: { params: Promise<{ id: string }
     const [isGeneratingDoc, setIsGeneratingDoc] = useState(false)
 
     // ── Scam Detection ────────────────────────────────────────────────────────
-    const scam = useScamDetection(userId)
-
-    // ── ML Optimization per Mode ──────────────────────────────────────────────
     const isExam = roomMode === 'exam';
     const isInterview = roomMode === 'interview';
     const isClassroom = roomMode === 'classroom';
-    const isOffice = roomMode === 'office' || roomMode === null;
+    const isOffice = roomMode === 'office';
+    const isNullMode = roomMode === null;
 
-    const enableFace = isExam || isClassroom || (isOffice && aiOptions.facialLandmarks);
-    const enableGaze = isClassroom || isInterview || (isOffice && aiOptions.gazeTracking);
-    const enableObjects = isExam || (isOffice && aiOptions.objectDetection);
-    const enableSentiment = isInterview || (isOffice && aiOptions.keywordSentiment);
-    const enableStress = isInterview || (isOffice && aiOptions.voiceStress);
-    const enableDeepfakeVideo = isOffice && aiOptions.deepfakeVideo;
-    const enableDeepfakeAudio = isOffice && aiOptions.deepfakeAudio;
-    const enableLinkScanner = isOffice && aiOptions.linkScanner;
-    const enableBehavioral = isClassroom || isInterview || (isOffice && aiOptions.behavioral);
+    // Fix camera delay: Only load heavy AI models AFTER the camera has successfully initialized
+    const isLocalStreamReady = !!localStream;
+    const aiReadyToLoad = !isNullMode && isLocalStreamReady;
+
+    const enableScamAI = isOffice && aiReadyToLoad;
+    const scam = useScamDetection(userId, enableScamAI)
+
+    // ── ML Optimization per Mode ──────────────────────────────────────────────
+    const enableFace = aiReadyToLoad && (isExam || isClassroom || isInterview);
+    const enableGaze = aiReadyToLoad && (isClassroom || isInterview || (isOffice && aiOptions.gazeTracking));
+    const enableObjects = aiReadyToLoad && isExam;
+    const enableSentiment = aiReadyToLoad && (isInterview || (isOffice && aiOptions.keywordSentiment));
+    const enableStress = aiReadyToLoad && (isInterview || (isOffice && aiOptions.voiceStress));
+    const enableDeepfakeVideo = aiReadyToLoad && (isOffice || isExam);
+    const enableDeepfakeAudio = aiReadyToLoad && (isOffice || isExam);
+    const enableLinkScanner = aiReadyToLoad && (isOffice && aiOptions.linkScanner);
+    const enableBehavioral = aiReadyToLoad && (isClassroom || isInterview || (isOffice && aiOptions.behavioral));
 
     // ── 2025/2026 Modern AI Hooks ─────────────────────────────────────────────
     const mediaPipeFace = useMediaPipeFace({
@@ -241,7 +272,12 @@ export default function MeetingPage({ params }: { params: Promise<{ id: string }
         updateScore: scam.updateScore,
     })
     const voice = useVoiceAnalysis({ enabled: scam.isEnabled && enableSentiment, updateScore: scam.updateScore })
-    const deepfake = useDeepfakeDetection({ videoRef: localVideoRef, enabled: scam.isEnabled && enableDeepfakeVideo, updateScore: scam.updateScore })
+    const deepfake = useDeepfakeDetection({ 
+        videoRef: localVideoRef, 
+        enabled: scam.isEnabled && enableDeepfakeVideo, 
+        updateScore: scam.updateScore,
+        mediaPipeFace
+    })
     const audioDeepfake = useAudioDeepfakeDetection({ localStream, enabled: scam.isEnabled && enableDeepfakeAudio, updateScore: scam.updateScore })
     const dire = useDireDetection({ videoRef: localVideoRef, enabled: scam.isEnabled && enableDeepfakeVideo, updateScore: scam.updateScore })
     const linkScanner = useLinkDetection({ enabled: scam.isEnabled && enableLinkScanner, updateScore: scam.updateScore })
@@ -471,9 +507,35 @@ export default function MeetingPage({ params }: { params: Promise<{ id: string }
                 const url = URL.createObjectURL(blob)
                 const a = document.createElement("a"); a.href = url; a.download = `Meet-${meetingId}.webm`
                 document.body.appendChild(a); a.click(); window.URL.revokeObjectURL(url)
+
+                // Export intelligent transcript and perfectly synced subtitles
+                if (recordingStartTimeRef.current) {
+                    // Merge local Whisper transcript with remote Socket captions
+                    const allCaptions: GlobalCaption[] = [
+                        ...globalTranscriptRef.current,
+                        ...whisper.transcriptHistory.map(s => ({ speakerId: userId, speakerName: s.speakerName, text: s.text, timestamp: s.timestamp }))
+                    ];
+                    
+                    const mdStr = generateMarkdownNotes(allCaptions, meetingId as string)
+                    const vttStr = generateVTT(allCaptions, recordingStartTimeRef.current)
+                    
+                    const mdBlob = new Blob([mdStr], { type: "text/markdown" })
+                    const mdUrl = URL.createObjectURL(mdBlob)
+                    const mdA = document.createElement("a"); mdA.href = mdUrl; mdA.download = `Meet-${meetingId}-Transcript.md`
+                    document.body.appendChild(mdA); mdA.click(); window.URL.revokeObjectURL(mdUrl)
+
+                    const vttBlob = new Blob([vttStr], { type: "text/vtt" })
+                    const vttUrl = URL.createObjectURL(vttBlob)
+                    const vttA = document.createElement("a"); vttA.href = vttUrl; vttA.download = `Meet-${meetingId}-Subtitles.vtt`
+                    document.body.appendChild(vttA); vttA.click(); window.URL.revokeObjectURL(vttUrl)
+                }
+
                 setIsRecording(false); displayStream.getTracks().forEach(t => t.stop())
+                recordingStartTimeRef.current = null
             }
-            mr.start(); setIsRecording(true)
+            mr.start(); 
+            setIsRecording(true)
+            recordingStartTimeRef.current = Date.now()
             displayStream.getVideoTracks()[0].onended = () => mr.stop()
         } catch (err) { console.error("Recording failed:", err) }
     }
@@ -489,17 +551,55 @@ export default function MeetingPage({ params }: { params: Promise<{ id: string }
         }
     }
 
+    const togglePiP = async () => {
+        if (!('documentPictureInPicture' in window)) {
+            // Fallback for unsupported browsers
+            alert("Document Picture-in-Picture API is not supported in your browser.");
+            return;
+        }
+        try {
+            // @ts-expect-error
+            const pipWindow = await window.documentPictureInPicture.requestWindow({ width: 640, height: 360 });
+            if (videoGridContainerRef.current) {
+                // Move grid into PiP window
+                pipWindow.document.body.appendChild(videoGridContainerRef.current);
+                // Copy styles to PiP window
+                Array.from(document.styleSheets).forEach(styleSheet => {
+                    try {
+                        if (styleSheet.cssRules) {
+                            const newStyleEl = document.createElement('style');
+                            Array.from(styleSheet.cssRules).forEach(rule => {
+                                newStyleEl.appendChild(document.createTextNode(rule.cssText));
+                            });
+                            pipWindow.document.head.appendChild(newStyleEl);
+                        }
+                    } catch (e) { /* ignore cross-origin stylesheet errs */ }
+                });
+                
+                pipWindow.addEventListener("pagehide", () => {
+                    // Move it back when closed
+                    const videoAreaInner = document.getElementById("video-area-inner");
+                    if (videoAreaInner && videoGridContainerRef.current) {
+                        videoAreaInner.appendChild(videoGridContainerRef.current);
+                    }
+                });
+            }
+        } catch (e) {
+            console.error("Failed to start PiP", e);
+        }
+    }
+
     const endCall = () => {
         stopRecording()
         // Feature 2: Show AI summary if we have Whisper transcript
         const transcript = whisper.getFullTranscript()
         if (transcript.trim()) {
             setMeetingDurationAtEnd(Date.now() - meetingStartTime)
-            if (localStream) localStream.getTracks().forEach(t => t.stop())
+            cameraManager.stopStream()
             setShowSummaryModal(true)
             return
         }
-        if (localStream) localStream.getTracks().forEach(t => t.stop())
+        cameraManager.stopStream()
         router.push("/")
     }
 
@@ -508,7 +608,7 @@ export default function MeetingPage({ params }: { params: Promise<{ id: string }
         router.push("/")
     }
 
-    const allStreams = [
+    const unsortedStreams = [
         { id: 'local', stream: finalLocalStream, label: displayName },
         ...Object.entries(remoteStreams).map(([id, stream]) => ({
             id,
@@ -517,17 +617,43 @@ export default function MeetingPage({ params }: { params: Promise<{ id: string }
         }))
     ]
 
+    const allStreams = [...unsortedStreams].sort((a, b) => {
+        if (a.id === 'local') return -1;
+        if (b.id === 'local') return 1;
+        if (a.id === activeSpeakerId) return -1;
+        if (b.id === activeSpeakerId) return 1;
+        return 0;
+    });
+
     const outerBorder = scam.isHighRisk
-        ? "2px solid rgba(239,68,68,0.5)"
+        ? "2px solid rgba(239,68,68,0.8)"
         : scam.isMediumRisk
-            ? "2px solid rgba(245,158,11,0.4)"
-            : "2px solid transparent"
+            ? "2px solid rgba(245,158,11,0.6)"
+            : "2px solid rgba(124, 58, 237, 0.3)" // CLARIVOX purple glow
 
     useEffect(() => {
         if (!socket) return
+        
+        // Track remote captions for global transcription
+        const handleRemoteCaption = (cap: any) => {
+            if (cap.speakerId !== userId) {
+                globalTranscriptRef.current.push({
+                    speakerId: cap.speakerId,
+                    speakerName: cap.speakerName,
+                    text: cap.text,
+                    timestamp: cap.timestamp
+                });
+            }
+        };
+        
         socket.on("mode-select", (mode: any) => setRoomMode(mode))
-        return () => { socket.off("mode-select") }
-    }, [socket])
+        socket.on("caption", handleRemoteCaption)
+        
+        return () => { 
+            socket.off("mode-select")
+            socket.off("caption", handleRemoteCaption) 
+        }
+    }, [socket, userId])
 
     if (roomMode === null) {
         return <ModeSelectionScreen 
@@ -542,21 +668,30 @@ export default function MeetingPage({ params }: { params: Promise<{ id: string }
         />
     }
 
+    // Base tabs available in all modes
     let sidebarTabs: { key: SidebarTab; icon: string; label: string }[] = [
-        { key: 'scam', icon: '🛡️', label: 'Scam AI' },
-        { key: 'attendance', icon: '🎓', label: 'Attendance' },
-        { key: 'tutor', icon: '🤖', label: 'AI Tutor' },
         { key: 'chat', icon: '💬', label: 'Chat' },
-        { key: 'participants', icon: '👥', label: 'People' },
-        { key: 'graph', icon: '🕸️', label: 'Threats' },
-        { key: 'polls', icon: '📊', label: 'Polls' },
-        { key: 'breakout', icon: '🚪', label: 'Rooms' },
-        { key: 'engagement', icon: '📈', label: 'Engage' },
-        // Mode-specific tabs
-        ...(roomMode === 'classroom' ? [{ key: 'classroom' as SidebarTab, icon: '🏫', label: 'Class' }] : []),
-        ...(roomMode === 'interview' ? [{ key: 'interview' as SidebarTab, icon: '🎤', label: 'Interview' }] : []),
-        ...(roomMode === 'exam' ? [{ key: 'exam_panel' as SidebarTab, icon: '📝', label: 'Exam Hall' }] : []),
+        { key: 'participants', icon: '👥', label: 'People' }
     ]
+
+    // We removed 'office' specific sidebar tabs because they are now launched from the bottom control bar menus.
+
+    if (roomMode === 'classroom') {
+        sidebarTabs.push(
+            { key: 'classroom' as SidebarTab, icon: '🏫', label: 'Class' },
+            { key: 'attendance', icon: '🎓', label: 'Attendance' },
+            { key: 'tutor', icon: '🤖', label: 'AI Tutor' },
+            { key: 'engagement', icon: '📈', label: 'Engage' }
+        )
+    } else if (roomMode === 'interview') {
+        sidebarTabs.push(
+            { key: 'interview' as SidebarTab, icon: '🎤', label: 'Interview' }
+        )
+    } else if (roomMode === 'exam') {
+        sidebarTabs.push(
+            { key: 'exam_panel' as SidebarTab, icon: '📝', label: 'Exam Hall' }
+        )
+    }
 
     // Restrict student sidebars
     if (!isHost) {
@@ -571,8 +706,9 @@ export default function MeetingPage({ params }: { params: Promise<{ id: string }
 
     return (
         <div ref={containerRef} style={{
-            backgroundColor: "#000000", height: "100vh", display: "flex", flexDirection: "column",
-            border: outerBorder, transition: "border-color 0.5s ease", boxSizing: "border-box", position: "relative"
+            backgroundColor: "#0b0f19", height: "100vh", display: "flex", flexDirection: "column",
+            border: outerBorder, transition: "border-color 0.5s ease", boxSizing: "border-box", position: "relative",
+            boxShadow: scam.isHighRisk ? "inset 0 0 100px rgba(239,68,68,0.2)" : "inset 0 0 50px rgba(124,58,237,0.05)"
         }}>
             {/* ── Modals ── */}
             {showSettings && <SettingsModal onClose={() => setShowSettings(false)} onDevicesSelected={() => { }} />}
@@ -688,13 +824,18 @@ export default function MeetingPage({ params }: { params: Promise<{ id: string }
 
             {/* ── Top Bar ── */}
             <div style={{ padding: "10px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div style={{ color: "white", fontSize: "1.1rem", fontWeight: 500, display: "flex", alignItems: "center", gap: "10px" }}>
-                    <span>🛡️</span>
-                    <span>Meet Clone</span>
+                <div style={{ color: "white", fontSize: "1.05rem", fontWeight: 700, display: "flex", alignItems: "center", gap: "10px" }}>
+                    <img src="/clarivox-logo.png" alt="CLARIVOX" style={{ width: 28, height: 28, borderRadius: 6, boxShadow: "0 0 10px rgba(124,58,237,0.6)" }} />
+                    <span style={{ background: "linear-gradient(135deg, #a78bfa, #06b6d4)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", letterSpacing: "0.06em" }}>CLARIVOX</span>
                     <span style={{ color: "#5f6368", fontSize: "12px" }}>|</span>
                     <span style={{ color: "#9ca3af", fontSize: "13px", fontFamily: "monospace" }}>
                         {meetingId.length >= 9 ? meetingId.replace(/(\d{3})(\d{3})(\d{3})/, "$1-$2-$3") : meetingId}
                     </span>
+                    {isArenaActive && (
+                        <span style={{ fontSize: "0.7rem", background: "rgba(124,58,237,0.2)", color: "#a78bfa", border: "1px solid rgba(124,58,237,0.4)", padding: "2px 8px", borderRadius: 20, letterSpacing: "0.05em" }}>
+                            ⚡ ARENA {congestionProb > 0.55 ? "🔴" : congestionProb > 0.3 ? "🟡" : "🟢"}
+                        </span>
+                    )}
                     {isRecording && (
                         <span style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "0.8rem", backgroundColor: "rgba(234,67,53,0.15)", color: "#ea4335", padding: "3px 8px", borderRadius: "4px" }}>
                             <span style={{ width: "7px", height: "7px", backgroundColor: "#ea4335", borderRadius: "50%", display: "inline-block", animation: "pulse 1.5s infinite" }} />
@@ -716,7 +857,7 @@ export default function MeetingPage({ params }: { params: Promise<{ id: string }
                             fontSize: "11px", fontWeight: "700", color: "#8ab4f8",
                             background: "#8ab4f815", border: "1px solid #8ab4f840",
                             padding: "2px 8px", borderRadius: "99px"
-                        }}>AI QoS: {(optimalBitrate / 1000).toFixed(0)}kbps</span>
+                        }}>AI QoS: {arenaState ? (arenaState.totalAllocatedBitrate / 1000).toFixed(0) : "--"}kbps</span>
                     )}
                 </div>
                 <div style={{ display: "flex", gap: "12px", alignItems: "center", color: "white", fontSize: "13px" }}>
@@ -724,6 +865,7 @@ export default function MeetingPage({ params }: { params: Promise<{ id: string }
                     <span style={{ color: "#9ca3af" }}>{mounted ? new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</span>
 
                     <button onClick={() => setShowInfo(true)} title="Meeting info" style={{ background: "none", border: "1px solid #5f6368", borderRadius: "6px", color: "white", padding: "4px 10px", cursor: "pointer", fontSize: "12px" }}>📋 Info</button>
+                    <button onClick={togglePiP} title="Picture-in-Picture" style={{ background: "none", border: "none", color: "#9ca3af", cursor: "pointer", fontSize: "18px" }}>🪟</button>
                     <button onClick={toggleFullscreen} title="Fullscreen" style={{ background: "none", border: "none", color: "#9ca3af", cursor: "pointer", fontSize: "18px" }}>{isFullscreen ? "⊡" : "⛶"}</button>
                     {isHost && (
                         <button onClick={() => { setRoomLocked(l => { const next = !l; socket?.emit("lock-room", next); return next }) }}
@@ -736,9 +878,18 @@ export default function MeetingPage({ params }: { params: Promise<{ id: string }
             </div>
 
             {/* ── Main Area ── */}
-            <div style={{ flex: 1, padding: "16px", display: "flex", gap: "16px", overflow: "hidden" }}>
+            <div className="main-area" style={{ flex: 1, padding: "16px", display: "flex", gap: "16px", overflow: "hidden" }}>
                 {/* Video grid */}
-                <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
+                <div className="video-area" id="video-area-inner" style={{ flex: 1, position: "relative", overflow: "hidden" }}>
+                    {/* Watermarking Overlay (Enterprise Security) */}
+                    <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 50, overflow: "hidden", opacity: 0.1, display: "flex", flexWrap: "wrap", justifyContent: "center", alignContent: "center", gap: "80px", transform: "rotate(-25deg) scale(1.5)" }}>
+                        {Array.from({ length: 30 }).map((_, i) => (
+                            <div key={i} style={{ color: "white", fontSize: "28px", fontWeight: "bold", userSelect: "none", whiteSpace: "nowrap" }}>
+                                {displayName} ({userId})
+                            </div>
+                        ))}
+                    </div>
+
                     {roomMode === 'exam' && !isHost ? (
                         <ExamStudentView
                             examState={exam.examState}
@@ -748,6 +899,8 @@ export default function MeetingPage({ params }: { params: Promise<{ id: string }
                             setAnswer={exam.setAnswer}
                             submitExam={exam.submitExam}
                             violations={exam.violations.filter(v => v.studentId === userId)}
+                            mediaPipeFace={mediaPipeFace}
+                            reportViolation={exam.reportViolation}
                         />
                     ) : pinnedId || layoutMode === 'spotlight' ? (
                         <>
@@ -768,13 +921,17 @@ export default function MeetingPage({ params }: { params: Promise<{ id: string }
                             </div>
                         </>
                     ) : (
-                        <div style={{
-                            display: "grid",
-                            gridTemplateColumns: `repeat(${Math.min(Math.ceil(Math.sqrt(allStreams.length)), 3)}, 1fr)`,
-                            gap: "12px", width: "100%", height: "100%"
+                        <div
+                            ref={videoGridContainerRef}
+                            style={{
+                                display: "flex",
+                                flexWrap: "wrap",
+                                alignContent: "center",
+                                justifyContent: "center",
+                                gap: "12px", width: "100%", height: "100%"
                         }}>
                             {allStreams.map(({ id, stream, label }) => (
-                                <div key={id} onClick={() => setPinnedId(id)} style={{ cursor: "pointer", height: "100%", width: "100%" }}>
+                                <div key={id} onClick={() => setPinnedId(id)} style={{ cursor: "pointer", height: `${gridDimensions.tileHeight}px`, width: `${gridDimensions.tileWidth}px`, transition: "all 0.3s ease" }}>
                                     <VideoPlayer
                                         ref={id === 'local' ? localVideoRef : undefined}
                                         stream={stream}
@@ -805,7 +962,7 @@ export default function MeetingPage({ params }: { params: Promise<{ id: string }
                 </div>
 
                 {/* ── Sidebar ── */}
-                <div style={{ width: "320px", display: "flex", flexDirection: "column", gap: "10px", flexShrink: 0 }}>
+                <div className="sidebar" style={{ width: "320px", display: "flex", flexDirection: "column", gap: "10px", flexShrink: 0 }}>
                     {/* Sidebar tabs */}
                     <div style={{ display: "flex", gap: "3px", flexWrap: "wrap" }}>
                         {sidebarTabs.map(tab => (
@@ -933,6 +1090,7 @@ export default function MeetingPage({ params }: { params: Promise<{ id: string }
                                 />
                             )
                         )}
+                        {activeSidebarTab === 'qna' && <QnAPanel socket={socket} userId={userId} displayName={displayName} isHost={isHost} />}
                         {activeSidebarTab === 'polls' && <PollsPanel socket={socket} userId={userId} displayName={displayName} isHost={isHost} />}
                         {activeSidebarTab === 'breakout' && <BreakoutRoomsPanel socket={socket} userId={userId} isHost={isHost} participants={participants} mainRoomId={meetingId as string} />}
                         {activeSidebarTab === 'graph' && <FraudNetworkGraph graph={fraudGraph} />}
@@ -984,9 +1142,9 @@ export default function MeetingPage({ params }: { params: Promise<{ id: string }
             </div>
 
             {/* ── Control Bar ── */}
-            <div style={{ height: "80px", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 20px", flexShrink: 0 }}>
+            <div className="control-bar" style={{ height: "80px", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 20px", flexShrink: 0 }}>
                 {/* Left: scan input */}
-                <div style={{ flex: 1 }}>
+                <div className="control-left" style={{ flex: 1 }}>
                     <input type="text" placeholder="Scan link (e.g. bit.ly/refund)" value={mockChatInput}
                         onChange={e => setMockChatInput(e.target.value)}
                         onKeyDown={e => { if (e.key === "Enter" && mockChatInput.trim()) { linkScanner.scanMessage(mockChatInput); setMockChatInput("") } }}
@@ -995,79 +1153,68 @@ export default function MeetingPage({ params }: { params: Promise<{ id: string }
                 </div>
 
                 {/* Center: main controls */}
-                <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "12px", flex: 1 }}>
-                    {/* Mic */}
+                <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "6px", flex: 1 }}>
+                    {/* Primary Controls */}
                     <CtrlBtn onClick={toggleAudio} active={isMuted} title="Mute (M)">
                         {isMuted
                             ? <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="1" y1="1" x2="23" y2="23" /><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6" /><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23" /><line x1="12" y1="19" x2="12" y2="23" /><line x1="8" y1="23" x2="16" y2="23" /></svg>
                             : <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" y1="19" x2="12" y2="23" /><line x1="8" y1="23" x2="16" y2="23" /></svg>
                         }
                     </CtrlBtn>
-                    {/* Camera */}
                     <CtrlBtn onClick={toggleVideo} active={isVideoOff} title="Camera (V)">
                         {isVideoOff
                             ? <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2m5.66 0H14a2 2 0 0 1 2 2v3.34l1 1L23 7v10" /><line x1="1" y1="1" x2="23" y2="23" /></svg>
                             : <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="23 7 16 12 23 17 23 7" /><rect x="1" y="5" width="15" height="14" rx="2" ry="2" /></svg>
                         }
                     </CtrlBtn>
-                    {/* Screen share */}
                     {isHost && (
                         <CtrlBtn onClick={isScreenSharing ? stopScreenShare : startScreenShare} active={isScreenSharing} title="Screen Share (S)" activeColor="#22c55e">
                             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="3" width="20" height="14" rx="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" /></svg>
                         </CtrlBtn>
                     )}
-                    {/* Recording */}
-                    {isHost && (
-                        <CtrlBtn onClick={isRecording ? stopRecording : startRecording} active={isRecording} title="Record">
-                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <circle cx="12" cy="12" r="10" />
-                                {isRecording ? <rect x="9" y="9" width="6" height="6" fill="currentColor" /> : <circle cx="12" cy="12" r="3" fill="currentColor" />}
-                            </svg>
-                        </CtrlBtn>
-                    )}
-                    {/* Captions */}
-                    <CtrlBtn onClick={() => setCaptionsEnabled(v => !v)} active={captionsEnabled} title="Captions" activeColor="#22c55e">
-                        <span style={{ fontSize: "13px", fontWeight: "bold" }}>CC</span>
-                    </CtrlBtn>
-                    {/* Whiteboard */}
-                    {isHost && (
-                        <CtrlBtn onClick={() => setShowWhiteboard(v => !v)} title="Whiteboard">
-                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="2" width="20" height="16" rx="2" /><path d="M6 20h12M8 16l3-6 3 6" /></svg>
-                        </CtrlBtn>
-                    )}
-                    {/* Unpin / grid */}
-                    <CtrlBtn onClick={() => setPinnedId(null)} title="Grid view">
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" /><rect x="7" y="7" width="3" height="3" /><rect x="14" y="7" width="3" height="3" /><rect x="7" y="14" width="3" height="3" /><rect x="14" y="14" width="3" height="3" /></svg>
-                    </CtrlBtn>
-                    {/* Reactions */}
                     {(!isExam || isHost) && <ReactionsBar onReact={reactions.sendReaction} />}
-                    {/* Settings */}
-                    <CtrlBtn onClick={() => setShowSettings(true)} title="Settings (⚙️)">
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>
-                    </CtrlBtn>
-                    {/* Theme */}
-                    <CtrlBtn onClick={() => setTheme(t => t === "dark" ? "light" : "dark")} title="Switch Theme">
-                        <span style={{ fontSize: "16px" }}>{theme === "dark" ? "☀️" : "🌙"}</span>
-                    </CtrlBtn>
-                    {/* Background */}
-                    <CtrlBtn onClick={() => setBgMode(m => m === "none" ? "blur" : m === "blur" ? "image" : "none")} active={bgMode !== "none"} title="Virtual Background" activeColor="#9333ea">
-                        <span style={{ fontSize: "16px" }}>🖼️</span>
-                    </CtrlBtn>
-                    {/* Noise Cancellation */}
-                    <CtrlBtn onClick={() => setNoiseReduction(v => !v)} active={noiseReduction} title="Noise Cancel" activeColor="#22c55e">
-                        <span style={{ fontSize: "16px" }}>🤫</span>
-                    </CtrlBtn>
-                    {/* AI Video Optimization */}
-                    {isHost && (
-                        <CtrlBtn onClick={() => setAiOptimizationEnabled(v => !v)} active={aiOptimizationEnabled} title="AI Call Optimizer" activeColor="#6366f1">
-                            <span style={{ fontSize: "16px" }}>🚀</span>
-                        </CtrlBtn>
-                    )}
+
+                    <div style={{ width: "1px", height: "32px", background: "rgba(255,255,255,0.1)", margin: "0 6px" }} />
+
+                    {/* Group 1: Security & AI */}
+                    <DropUpMenu title="Security" icon="🛡️" badge={scam.isHighRisk ? "!" : undefined}>
+                        {isHost && <MenuItem onClick={() => setRoomLocked(l => { const next = !l; socket?.emit("lock-room", next); return next })} icon={roomLocked ? "🔒" : "🔓"} label={roomLocked ? "Unlock Meeting" : "Lock Meeting"} active={roomLocked} />}
+                        {isHost && <MenuItem onClick={() => setAiOptimizationEnabled(v => !v)} icon="🚀" label="AI Call Optimizer" active={aiOptimizationEnabled} />}
+                        <MenuItem onClick={() => setActiveSidebarTab("scam")} icon="🛑" label="Scam AI Dashboard" active={activeSidebarTab === "scam"} danger={scam.isHighRisk} />
+                        <MenuItem onClick={() => setActiveSidebarTab("graph")} icon="🕸️" label="Network Threats" active={activeSidebarTab === "graph"} />
+                    </DropUpMenu>
+
+                    {/* Group 2: Audio/Video Effects */}
+                    <DropUpMenu title="Effects" icon="✨">
+                        <MenuItem onClick={() => setBgMode(m => m === "none" ? "blur" : m === "blur" ? "image" : "none")} icon="🖼️" label="Virtual Background" active={bgMode !== "none"} />
+                        <MenuItem onClick={() => setNoiseReduction(v => !v)} icon="🤫" label="Noise Cancellation" active={noiseReduction} />
+                    </DropUpMenu>
+
+                    {/* Group 3: Apps & Tools */}
+                    <DropUpMenu title="Apps" icon="🛠️">
+                        <MenuItem onClick={() => setActiveSidebarTab("qna")} icon="❓" label="Q&A" active={activeSidebarTab === "qna"} />
+                        <MenuItem onClick={() => setActiveSidebarTab("polls")} icon="📊" label="Polls" active={activeSidebarTab === "polls"} />
+                        {isHost && <MenuItem onClick={() => setActiveSidebarTab("breakout")} icon="🚪" label="Breakout Rooms" active={activeSidebarTab === "breakout"} />}
+                        {isHost && <MenuItem onClick={() => setShowWhiteboard(v => !v)} icon="🖍️" label="Whiteboard" active={showWhiteboard} />}
+                        {isHost && <MenuItem onClick={isRecording ? stopRecording : startRecording} icon="⏺️" label="Record Meeting" active={isRecording} danger={isRecording} />}
+                    </DropUpMenu>
+
+                    {/* Group 4: View & Preferences */}
+                    <DropUpMenu title="View" icon="👁️">
+                        <MenuItem onClick={() => setCaptionsEnabled(v => !v)} icon="💬" label="Live Captions" active={captionsEnabled} />
+                        <MenuItem onClick={() => setPinnedId(null)} icon="🔠" label="Grid View" active={pinnedId === null} />
+                        <MenuItem onClick={togglePiP} icon="🪟" label="Picture-in-Picture" />
+                        <MenuItem onClick={toggleFullscreen} icon={isFullscreen ? "⊡" : "⛶"} label="Fullscreen" active={isFullscreen} />
+                        <MenuItem onClick={() => setTheme(t => t === "dark" ? "light" : "dark")} icon={theme === "dark" ? "☀️" : "🌙"} label={`${theme === "dark" ? "Light" : "Dark"} Theme`} />
+                        <MenuItem onClick={() => setShowSettings(true)} icon="⚙️" label="Device Settings" />
+                    </DropUpMenu>
+
                     {/* End call */}
+                    <div style={{ width: "1px", height: "32px", background: "rgba(255,255,255,0.1)", margin: "0 6px" }} />
                     <button onClick={endCall} title="End call" style={{
                         width: "60px", height: "40px", borderRadius: "24px", background: "#ea4335",
                         color: "white", border: "none", display: "flex", alignItems: "center",
-                        justifyContent: "center", cursor: "pointer", marginLeft: "8px"
+                        justifyContent: "center", cursor: "pointer", marginLeft: "4px"
                     }}>
                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.42 19.42 0 0 1-3.33-2.67m-2.67-3.34a19.79 19.79 0 0 1-3.07-8.63A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91" /><line x1="23" y1="1" x2="1" y2="23" /></svg>
                     </button>
@@ -1080,6 +1227,29 @@ export default function MeetingPage({ params }: { params: Promise<{ id: string }
                     @keyframes strobeWarning { 0% { opacity:1; filter: brightness(1); } 50% { opacity:0.9; filter: brightness(1.2); } 100% { opacity:0.95; filter: brightness(0.8); } }
                     @keyframes floatUp { 0% { opacity:1; transform: translateY(0); } 100% { opacity:0; transform: translateY(-200px); } }
                     @keyframes slideUp { from { opacity:0; transform: translateX(-50%) translateY(10px); } to { opacity:1; transform: translateX(-50%) translateY(0); } }
+                    
+                    /* Mobile Responsive Layout overrides */
+                    @media (max-width: 768px) {
+                        .main-area {
+                            flex-direction: column !important;
+                            padding: 8px !important;
+                            gap: 8px !important;
+                        }
+                        .sidebar {
+                            width: 100% !important;
+                            height: 35vh !important;
+                            flex-shrink: 0 !important;
+                        }
+                        .control-bar {
+                            width: 100% !important;
+                            overflow-x: auto !important;
+                            justify-content: flex-start !important;
+                            padding: 0 10px !important;
+                        }
+                        .control-left {
+                            display: none !important;
+                        }
+                    }
                 `}</style>
             </div>
 
@@ -1118,6 +1288,59 @@ function CtrlBtn({ onClick, active, title, children, activeColor }: {
             onMouseUp={e => { e.currentTarget.style.transform = "scale(1)" }}
         >
             {children}
+        </button>
+    )
+}
+
+function DropUpMenu({ title, icon, children, badge }: { title: string, icon: React.ReactNode, children: React.ReactNode, badge?: string }) {
+    const [open, setOpen] = useState(false);
+    return (
+        <div style={{ position: "relative" }} onMouseLeave={() => setOpen(false)}>
+            <button 
+                onClick={() => setOpen(!open)}
+                style={{ 
+                    background: open ? "rgba(255,255,255,0.15)" : "transparent",
+                    color: "white", border: "none", cursor: "pointer", 
+                    display: "flex", flexDirection: "column", alignItems: "center", 
+                    justifyContent: "center", gap: "2px", padding: "8px 12px", borderRadius: "8px",
+                    transition: "background 0.2s"
+                }}
+                onMouseEnter={e => { if(!open) e.currentTarget.style.background = "rgba(255,255,255,0.08)" }}
+                onMouseLeave={e => { if(!open) e.currentTarget.style.background = "transparent" }}
+            >
+                <div style={{ fontSize: "20px", position: "relative" }}>
+                    {icon}
+                    {badge && <span style={{ position: "absolute", top: -4, right: -8, background: "#ef4444", color: "white", fontSize: "9px", padding: "1px 4px", borderRadius: "8px", fontWeight: "bold" }}>{badge}</span>}
+                </div>
+                <div style={{ fontSize: "11px", color: "#d1d5db", fontWeight: 500 }}>{title}</div>
+            </button>
+            {open && (
+                <div style={{ 
+                    position: "absolute", bottom: "calc(100% + 10px)", left: "50%", transform: "translateX(-50%)", 
+                    background: "#1f2937", border: "1px solid #374151", borderRadius: "12px", 
+                    padding: "8px", display: "flex", flexDirection: "column", gap: "4px", 
+                    minWidth: "180px", zIndex: 200, boxShadow: "0 10px 25px rgba(0,0,0,0.5)" 
+                }}>
+                    {children}
+                </div>
+            )}
+        </div>
+    )
+}
+
+function MenuItem({ onClick, icon, label, active, danger }: { onClick: () => void, icon: string, label: string, active?: boolean, danger?: boolean }) {
+    return (
+        <button onClick={onClick} style={{
+            background: active ? (danger ? "#ef4444" : "#3b82f6") : "transparent",
+            color: active ? "white" : (danger ? "#ef4444" : "#e5e7eb"),
+            border: "none", padding: "8px 12px", borderRadius: "6px",
+            display: "flex", alignItems: "center", gap: "10px", cursor: "pointer",
+            textAlign: "left", fontSize: "13px", fontWeight: active ? "bold" : "normal",
+            transition: "background 0.2s"
+        }}
+        onMouseEnter={e => { if(!active) e.currentTarget.style.background = danger ? "#ef444420" : "#374151" }}
+        onMouseLeave={e => { if(!active) e.currentTarget.style.background = "transparent" }}>
+            <span style={{ fontSize: "16px" }}>{icon}</span> {label}
         </button>
     )
 }

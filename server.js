@@ -24,6 +24,9 @@ const roomParticipants = {};
 // examSessions[roomId] = { active, endTimestamp, mode, hostUserId }
 const examSessions = {};
 
+// ── Q&A State ───────────────────────────────────────────────────────────────
+const qnaSessions = {};
+
 // ── Server-authoritative host registry ──────────────────────────────────────
 // roomHosts[roomId] = userId  — ONLY set when user joins; never overridden by client
 const roomHosts = {};
@@ -124,15 +127,92 @@ const breakoutRooms = {};
 app.prepare().then(() => {
     const httpServer = createServer(handler);
     const io = new Server(httpServer);
+    // 🛡️ LAYER 3: BEHAVIORAL AI FIREWALL 🛡️
+    const ipBlacklist = new Set();
+    const joinAttempts = {}; // Tracks rapid join attempts per IP
 
     io.on("connection", (socket) => {
+        // Simple IP extraction
+        const clientIp = socket.handshake.address;
+
+        if (ipBlacklist.has(clientIp)) {
+            console.warn(`[BEHAVIORAL FIREWALL] 🛑 Rejected connection from blacklisted IP: ${clientIp}`);
+            socket.disconnect(true);
+            return;
+        }
+
         console.log("User connected:", socket.id);
+
+        // 🛡️ LAYER 2: APPLICATION LAYER FIREWALL (WAF) 🛡️
+        // This middleware intercepts EVERY event before it hits the server logic.
+        let eventCount = 0;
+        let lastEventTime = Date.now();
+        
+        socket.use(([event, ...args], next) => {
+            // 1. Aggressive Global Rate Limiting (Anti-DDoS)
+            const now = Date.now();
+            if (now - lastEventTime > 1000) {
+                eventCount = 0;
+                lastEventTime = now;
+            }
+            eventCount++;
+            if (eventCount > 100) { // Max 100 events per second
+                console.warn(`[FIREWALL] 🛑 Socket ${socket.id} blocked for spamming.`);
+                socket.disconnect(true); // Abrupt connection termination
+                return next(new Error("Rate limit exceeded"));
+            }
+
+            // 2. Deep Payload Inspection & Sanitization
+            const sanitize = (obj) => {
+                if (typeof obj === 'string') {
+                    if (obj.length > 5000) { // Prevent Buffer Overflow attacks
+                        throw new Error("Payload too large");
+                    }
+                    // Strip dangerous HTML/Script tags (Basic XSS protection)
+                    return obj.replace(/<[^>]*>?/gm, ''); 
+                }
+                if (typeof obj === 'object' && obj !== null) {
+                    // Prevent NoSQL Injection structures (like $where)
+                    if (Object.keys(obj).some(k => k.startsWith('$'))) {
+                        throw new Error("Invalid payload structure");
+                    }
+                    for (const key in obj) {
+                        obj[key] = sanitize(obj[key]);
+                    }
+                }
+                return obj;
+            };
+
+            try {
+                for (let i = 0; i < args.length; i++) {
+                    args[i] = sanitize(args[i]);
+                }
+                next(); // Passed inspection
+            } catch (err) {
+                console.warn(`[FIREWALL] 🛑 Blocked malicious payload from ${socket.id}: ${err.message}`);
+                socket.disconnect(true);
+                return next(err);
+            }
+        });
 
         let currentRoom = null;
         let currentUser = null;
 
         // ── Join room ────────────────────────────────────────────────────────
         socket.on("join-room", (roomId, userId, displayName = "Guest") => {
+            // Layer 3: Brute-Force Detection
+            if (!joinAttempts[clientIp]) joinAttempts[clientIp] = [];
+            const now = Date.now();
+            joinAttempts[clientIp] = joinAttempts[clientIp].filter(t => now - t < 10000); // 10 second window
+            joinAttempts[clientIp].push(now);
+            
+            if (joinAttempts[clientIp].length > 5) { // More than 5 joins in 10 seconds
+                console.error(`[BEHAVIORAL FIREWALL] 🛑 Brute-force attack detected from ${clientIp}. Blacklisting IP.`);
+                ipBlacklist.add(clientIp);
+                socket.disconnect(true);
+                return;
+            }
+
             socket.join(roomId);
             currentRoom = roomId;
             currentUser = userId;
@@ -348,9 +428,60 @@ app.prepare().then(() => {
         });
 
         // ── Q&A ───────────────────────────────────────────────────────────────
-        socket.on("qa-question", (question) => {
-            if (!currentRoom) return;
-            io.to(currentRoom).emit("qa-question", question);
+        socket.on("get-qna", () => {
+            const roomId = currentRoom;
+            if (!roomId) return;
+            if (!qnaSessions[roomId]) qnaSessions[roomId] = [];
+            socket.emit("qna-update", qnaSessions[roomId]);
+        });
+
+        socket.on("qna-ask", ({ authorName, text }) => {
+            const roomId = currentRoom;
+            if (!roomId) return;
+            if (!qnaSessions[roomId]) qnaSessions[roomId] = [];
+            
+            const question = {
+                id: Math.random().toString(36).substr(2, 9),
+                authorId: currentUser,
+                authorName,
+                text,
+                upvotes: 0,
+                upvotedBy: [],
+                isAnswered: false,
+                timestamp: Date.now()
+            };
+            qnaSessions[roomId].push(question);
+            io.to(roomId).emit("qna-update", qnaSessions[roomId]);
+        });
+
+        socket.on("qna-upvote", ({ questionId }) => {
+            const roomId = currentRoom;
+            if (!roomId || !qnaSessions[roomId]) return;
+            
+            const q = qnaSessions[roomId].find(q => q.id === questionId);
+            if (q) {
+                const idx = q.upvotedBy.indexOf(currentUser);
+                if (idx > -1) {
+                    q.upvotedBy.splice(idx, 1);
+                    q.upvotes--;
+                } else {
+                    q.upvotedBy.push(currentUser);
+                    q.upvotes++;
+                }
+                io.to(roomId).emit("qna-update", qnaSessions[roomId]);
+            }
+        });
+
+        socket.on("qna-answered", ({ questionId }) => {
+            const roomId = currentRoom;
+            if (!roomId || !qnaSessions[roomId]) return;
+            if (!isVerifiedHost(roomId, currentUser)) return;
+            
+            const q = qnaSessions[roomId].find(q => q.id === questionId);
+            if (q) {
+                q.isAnswered = true;
+                io.to(roomId).emit("qna-update", qnaSessions[roomId]);
+            }
         });
 
         // ── Breakout rooms ────────────────────────────────────────────────────

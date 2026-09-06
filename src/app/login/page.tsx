@@ -4,96 +4,207 @@ import { useActionState } from "react"
 import { loginAction } from "@/app/actions/authActions"
 import Link from "next/link"
 import { signIn } from "next-auth/react"
+import dynamic from "next/dynamic"
+import { motion } from "framer-motion"
+
+const LoginBackground = dynamic(
+  () => import("@/components/PageBackgrounds").then(m => m.LoginBackground),
+  { ssr: false }
+)
 
 export default function LoginPage() {
-    const [state, formAction, isPending] = useActionState(loginAction, null)
+  const [state, formAction, isPending] = useActionState(loginAction, null)
 
-    return (
-        <div className="home-container" style={{ justifyContent: "center", alignItems: "center" }}>
-            <div className="glass-panel" style={{ padding: "2.5rem", width: "100%", maxWidth: "420px" }}>
-                <div style={{ textAlign: "center", marginBottom: "2rem" }}>
-                    <h1 style={{ fontSize: "1.75rem", marginBottom: "0.5rem" }}>Sign in to Meet Clone</h1>
-                    <p style={{ color: "var(--text-muted)", fontSize: "0.95rem" }}>
-                        Continue to an ad-free video meeting experience.
-                    </p>
-                </div>
+  return (
+    <div style={{
+      width: "100%", minHeight: "100vh",
+      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+      background: "#0a0010", fontFamily: "'Inter', sans-serif", position: "relative",
+      padding: "20px", boxSizing: "border-box", overflowX: "hidden"
+    }}>
+      <LoginBackground />
+      {/* Background Award Spotlight effect */}
+      <div style={{
+        position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
+        width: "100vw", height: "100vw", maxWidth: 800, maxHeight: 800,
+        background: "radial-gradient(circle, rgba(255,215,0,0.15) 0%, rgba(180,80,255,0.05) 40%, transparent 70%)",
+        animation: "pulse-glow 4s infinite alternate", pointerEvents: "none", zIndex: 0
+      }} />
 
-                <form action={formAction} style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-                    {state?.error && (
-                        <div style={{ padding: "0.75rem", background: "var(--danger-color)", color: "white", borderRadius: "6px", fontSize: "0.9rem", opacity: 0.9 }}>
-                            {state.error}
-                        </div>
-                    )}
+      {/* Award-winner rotating rays keyframes */}
+      <style>{`
+        @keyframes rotate-rays {
+          100% { transform: rotate(360deg); }
+        }
+        @keyframes pulse-glow {
+          0%   { box-shadow: 0 0 10px rgba(255,215,0,0.35), 0 0 20px rgba(180,80,255,0.2); }
+          100% { box-shadow: 0 0 22px rgba(255,215,0,0.7), 0 0 45px rgba(180,80,255,0.4), 0 0 70px rgba(255,215,0,0.1); }
+        }
+        .award-icon-wrap {
+          position: relative;
+          width: 62px; height: 62px;
+          margin: 0 auto 12px;
+          border-radius: 18px;
+          overflow: visible;
+          animation: pulse-glow 2s infinite alternate;
+        }
+        .award-icon-wrap::before {
+          content: '';
+          position: absolute;
+          top: -50%; left: -50%;
+          width: 200%; height: 200%;
+          background: conic-gradient(
+            transparent 0deg,
+            rgba(255,215,0,0.45) 40deg,
+            transparent 85deg,
+            rgba(180,80,255,0.35) 130deg,
+            transparent 175deg,
+            rgba(255,215,0,0.45) 220deg,
+            transparent 265deg,
+            rgba(180,80,255,0.35) 310deg,
+            transparent 360deg
+          );
+          animation: rotate-rays 6s linear infinite;
+          border-radius: 50%;
+          z-index: 0;
+        }
+        .award-icon-inner {
+          position: relative; z-index: 1;
+          width: 100%; height: 100%;
+          background: linear-gradient(135deg, #7c3aed, #a855f7);
+          border-radius: 18px;
+          display: flex; align-items: center; justify-content: center;
+          box-shadow: 0 0 30px rgba(124,58,237,0.5), 0 0 60px rgba(124,58,237,0.2);
+        }
+      `}</style>
 
-                    <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                        <label htmlFor="email" style={{ fontSize: "0.9rem", fontWeight: 500 }}>Email Address</label>
-                        <input
-                            id="email"
-                            name="email"
-                            type="email"
-                            required
-                            className="join-input"
-                            style={{ width: "100%" }}
-                            placeholder="you@example.com"
-                        />
-                    </div>
+      {/* Card */}
+      <motion.div
+        initial={{ opacity: 0, y: 20, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+        style={{
+          position: "relative", zIndex: 10,
+          width: "100%", maxWidth: 380, margin: "auto",
+          padding: "clamp(24px, 6vw, 36px) clamp(20px, 6vw, 32px)",
+          background: "linear-gradient(145deg, rgba(255,255,255,0.03), rgba(0,0,0,0.4))",
+          backdropFilter: "blur(40px) saturate(180%)",
+          border: "1px solid rgba(180,100,255,0.25)",
+          borderRadius: 24, boxSizing: "border-box",
+          boxShadow: "0 0 0 1px rgba(255,215,0,0.1), 0 20px 50px rgba(0,0,0,0.5), inset 0 1px 1px rgba(255,255,255,0.1), 0 0 30px rgba(140,0,255,0.06)",
+        }}>
 
-                    <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                        <label htmlFor="password" style={{ fontSize: "0.9rem", fontWeight: 500 }}>Password</label>
-                        <input
-                            id="password"
-                            name="password"
-                            type="password"
-                            required
-                            className="join-input"
-                            style={{ width: "100%" }}
-                            placeholder="••••••••"
-                        />
-                    </div>
-
-                    <button
-                        type="submit"
-                        className="btn btn-primary"
-                        style={{ width: "100%", marginTop: "0.5rem" }}
-                        disabled={isPending}
-                    >
-                        {isPending ? "Signing in..." : "Sign In with Email"}
-                    </button>
-                </form>
-
-                <div style={{ display: "flex", alignItems: "center", margin: "1.5rem 0", gap: "10px" }}>
-                    <div style={{ flex: 1, height: "1px", background: "rgba(255,255,255,0.1)" }}></div>
-                    <span style={{ fontSize: "0.85rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "1px" }}>or</span>
-                    <div style={{ flex: 1, height: "1px", background: "rgba(255,255,255,0.1)" }}></div>
-                </div>
-
-                <button
-                    onClick={() => signIn("google", { callbackUrl: "/" })}
-                    style={{
-                        width: "100%", padding: "0.75rem", borderRadius: "8px",
-                        background: "#fff", color: "#000", border: "none",
-                        fontSize: "0.95rem", fontWeight: 600, cursor: "pointer",
-                        display: "flex", alignItems: "center", justifyContent: "center", gap: "10px",
-                        transition: "all 0.2s ease"
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.opacity = "0.9"}
-                    onMouseLeave={(e) => e.currentTarget.style.opacity = "1"}
-                >
-                    <svg width="20" height="20" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
-                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-                        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
-                        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
-                    </svg>
-                    Continue with Google
-                </button>
-
-                <div style={{ marginTop: "2rem", textAlign: "center", fontSize: "0.9rem" }}>
-                    <p style={{ color: "var(--text-muted)" }}>
-                        Don&apos;t have an account? <Link href="/register" style={{ color: "var(--accent-color)", fontWeight: 500 }}>Create account</Link>
-                    </p>
-                </div>
-            </div>
+        {/* Rotating rays on card edge */}
+        <div style={{
+          position: "absolute", inset: 0, borderRadius: 24, overflow: "hidden",
+          pointerEvents: "none", zIndex: 0,
+        }}>
+          <div style={{
+            position: "absolute", top: "-50%", left: "-50%",
+            width: "200%", height: "200%",
+            background: `conic-gradient(
+              transparent 0deg, rgba(255,215,0,0.12) 45deg,
+              transparent 90deg, rgba(180,80,255,0.08) 135deg,
+              transparent 180deg, rgba(255,215,0,0.12) 225deg,
+              transparent 270deg, rgba(180,80,255,0.08) 315deg,
+              transparent 360deg
+            )`,
+            animation: "rotate-rays 10s linear infinite",
+          }} />
+          {/* Dark overlay so rays only show at edges */}
+          <div style={{
+            position: "absolute", inset: 1, borderRadius: 23,
+            background: "linear-gradient(145deg, rgba(18,5,40,0.97), rgba(5,0,20,0.97))",
+          }} />
         </div>
-    )
+
+        {/* Content (above the ray overlay) */}
+        <div style={{ position: "relative", zIndex: 1 }}>
+          {/* Header */}
+          <div style={{ textAlign: "center", marginBottom: "1.5rem" }}>
+            <div className="award-icon-wrap">
+              <div className="award-icon-inner">
+                <span style={{ fontSize: 26 }}>⚡</span>
+              </div>
+            </div>
+            <h1 style={{
+              fontSize: "clamp(1.4rem, 5vw, 1.75rem)", fontWeight: 800, letterSpacing: -0.5,
+              background: "linear-gradient(135deg, #c084fc, #818cf8, #06b6d4)",
+              WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+              marginBottom: "0.2rem", margin: 0,
+            }}>AEXIS</h1>
+            <p style={{ color: "rgba(255,255,255,0.4)", fontSize: "0.82rem", marginTop: 4 }}>
+              Sign in to your Aexis account
+            </p>
+          </div>
+
+          <form action={formAction} style={{ display: "flex", flexDirection: "column", gap: "0.8rem" }}>
+            {state?.error && (
+              <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
+                style={{ padding: "0.6rem 0.9rem", background: "rgba(239,68,68,0.15)", color: "#fca5a5",
+                  border: "1px solid rgba(239,68,68,0.3)", borderRadius: 10, fontSize: "0.82rem" }}>
+                {state.error}
+              </motion.div>
+            )}
+
+            {[
+              { id: "email", label: "Email Address", type: "email", placeholder: "you@example.com" },
+              { id: "password", label: "Password", type: "password", placeholder: "••••••••" },
+            ].map(field => (
+              <div key={field.id} style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
+                <label htmlFor={field.id} style={{ fontSize: "0.78rem", fontWeight: 600, color: "rgba(255,255,255,0.65)", letterSpacing: 0.3 }}>
+                  {field.label}
+                </label>
+                <input id={field.id} name={field.id} type={field.type} required placeholder={field.placeholder}
+                  style={{
+                    background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)",
+                    borderRadius: 10, padding: "0.65rem 0.9rem", color: "#fff", fontSize: "0.9rem",
+                    outline: "none", fontFamily: "inherit", width: "100%", boxSizing: "border-box",
+                    boxShadow: "inset 0 2px 8px rgba(0,0,0,0.3)", transition: "border-color 0.2s",
+                  }}
+                  onFocus={e => e.target.style.borderColor = "rgba(168,85,247,0.6)"}
+                  onBlur={e => e.target.style.borderColor = "rgba(255,255,255,0.1)"}
+                />
+              </div>
+            ))}
+
+            <motion.button type="submit" disabled={isPending}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              style={{
+                marginTop: "0.3rem", height: 46, width: "100%", cursor: isPending ? "not-allowed" : "pointer",
+                background: "linear-gradient(90deg, #7c3aed, #a855f7)", border: "none",
+                borderRadius: 12, color: "#fff", fontSize: "0.92rem", fontWeight: 700,
+                fontFamily: "inherit", boxShadow: "0 8px 20px rgba(124,58,237,0.35)",
+                transition: "box-shadow 0.3s ease", opacity: isPending ? 0.7 : 1,
+              }}>
+              {isPending ? "Signing in..." : "Sign In →"}
+            </motion.button>
+          </form>
+
+          <div style={{ marginTop: "0.8rem" }}>
+            <motion.button onClick={() => signIn("google", { callbackUrl: "/" })}
+              whileHover={{ scale: 1.01, backgroundColor: "rgba(255,255,255,0.08)" }}
+              whileTap={{ scale: 0.98 }}
+              style={{
+                width: "100%", padding: "0.65rem", borderRadius: 12,
+                border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)",
+                color: "rgba(255,255,255,0.8)", cursor: "pointer", fontSize: "0.85rem",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem",
+                fontFamily: "inherit", transition: "background 0.2s",
+              }}>
+              <span style={{ fontSize: "1rem" }}>🔵</span> Continue with Google
+            </motion.button>
+          </div>
+
+          <p style={{ textAlign: "center", marginTop: "1.1rem", fontSize: "0.82rem", color: "rgba(255,255,255,0.4)" }}>
+            New to Aexis?{" "}
+            <Link href="/register" style={{ color: "#c084fc", fontWeight: 600, textDecoration: "none" }}>
+              Create account
+            </Link>
+          </p>
+        </div>
+      </motion.div>
+    </div>
+  )
 }

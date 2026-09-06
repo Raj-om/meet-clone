@@ -7,6 +7,8 @@ import type {
     ExamAnswers,
     StudentViolation,
 } from "@/hooks/useExamSession"
+import { useCognitiveGap } from "@/hooks/useCognitiveGap"
+import { cameraManager } from "@/utils/cameraManager"
 
 // ─────────────────────────────────────────────────────────────────────────────
 interface Props {
@@ -17,6 +19,8 @@ interface Props {
     setAnswer: (questionId: string, answer: string) => void
     submitExam: () => void
     violations: StudentViolation[]
+    mediaPipeFace?: any
+    reportViolation?: (type: any, desc: string) => void
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -24,22 +28,22 @@ interface Props {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const C = {
-    bg:          "#1e1e2e",
-    surface:     "#27273f",
-    surfaceHi:   "#2e2e4a",
-    card:        "rgba(255,255,255,0.05)",
-    border:      "rgba(255,255,255,0.09)",
-    violet:      "#7c3aed",
+    bg:          "#0b0f19",
+    surface:     "rgba(255, 255, 255, 0.02)",
+    surfaceHi:   "rgba(255, 255, 255, 0.05)",
+    card:        "rgba(255, 255, 255, 0.04)",
+    border:      "rgba(255, 255, 255, 0.08)",
+    violet:      "#8b5cf6",
     violetHi:    "#a78bfa",
-    violetGlow:  "rgba(124,58,237,0.35)",
-    violetSel:   "rgba(124,58,237,0.18)",
-    red:         "#dc2626",
-    redHi:       "#ef4444",
+    violetGlow:  "rgba(139, 92, 246, 0.3)",
+    violetSel:   "rgba(139, 92, 246, 0.15)",
+    red:         "#ef4444",
+    redHi:       "#f87171",
     amber:       "#f59e0b",
     amberHi:     "#fbbf24",
-    green:       "#16a34a",
-    greenHi:     "#22c55e",
-    text:        "#f1f5f9",
+    green:       "#10b981",
+    greenHi:     "#34d399",
+    text:        "#f8fafc",
     muted:       "#94a3b8",
     dim:         "#475569",
 } as const
@@ -410,16 +414,16 @@ function WaitingRoom() {
     const videoRef = useRef<HTMLVideoElement>(null)
 
     useEffect(() => {
-        let stream: MediaStream | null = null
-        navigator.mediaDevices?.getUserMedia({ video: true, audio: false })
+        let mounted = true
+        cameraManager.getStream()
             .then(s => {
-                stream = s
+                if (!mounted) return
                 if (videoRef.current) {
                     videoRef.current.srcObject = s
                 }
             })
             .catch(() => {/* Camera not available — no-op */})
-        return () => { stream?.getTracks().forEach(t => t.stop()) }
+        return () => { mounted = false }
     }, [])
 
     return (
@@ -439,6 +443,40 @@ function WaitingRoom() {
                 flexDirection: "column",
                 gap: "20px",
             }}>
+                {/* AI Proctoring Shield Banner */}
+                <div style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    background: "linear-gradient(90deg, rgba(16,185,129,0.1), rgba(16,185,129,0.02))",
+                    border: "1px solid rgba(16,185,129,0.2)",
+                    borderRadius: "14px",
+                    padding: "12px 20px",
+                    boxShadow: "0 4px 20px rgba(16,185,129,0.05)"
+                }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                        <div style={{
+                            width: "24px", height: "24px", borderRadius: "50%",
+                            background: "rgba(16,185,129,0.2)", display: "flex",
+                            alignItems: "center", justifyContent: "center", color: "#34d399",
+                            boxShadow: "0 0 10px rgba(16,185,129,0.5)",
+                            animation: "softPulse 2s infinite"
+                        }}>
+                            <svg viewBox="0 0 24 24" fill="none" style={{ width: "14px" }} aria-hidden="true">
+                                <path d="M12 2.8 20 6v5.7c0 4.7-3.2 8.2-8 9.8-4.8-1.6-8-5.1-8-9.8V6l8-3.2Z" stroke="currentColor" strokeWidth="2.5" />
+                            </svg>
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column" }}>
+                            <span style={{ color: "#34d399", fontWeight: 700, fontSize: "13px", letterSpacing: "0.5px" }}>CLARIVOX PROCTORING ACTIVE</span>
+                            <span style={{ color: C.muted, fontSize: "11px" }}>Environment secured by Vision AI & Deepfake Shield</span>
+                        </div>
+                    </div>
+                    <div style={{ fontSize: "11px", color: "#34d399", fontWeight: 600, display: "flex", alignItems: "center", gap: "6px" }}>
+                        <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#34d399", boxShadow: "0 0 8px #34d399" }} />
+                        Secured
+                    </div>
+                </div>
+
                 {/* Header card */}
                 <div style={{
                     background: C.card,
@@ -710,7 +748,7 @@ function SubmittedScreen({
 // ─────────────────────────────────────────────────────────────────────────────
 
 function ActiveExam({
-    questions, answers, examTimeRemaining, setAnswer, submitExam, violations,
+    questions, answers, examTimeRemaining, setAnswer, submitExam, violations, mediaPipeFace, reportViolation,
 }: {
     questions: ExamQuestion[]
     answers: ExamAnswers
@@ -718,11 +756,31 @@ function ActiveExam({
     setAnswer: (qid: string, answer: string) => void
     submitExam: () => void
     violations: StudentViolation[]
+    mediaPipeFace?: any
+    reportViolation?: (type: any, desc: string) => void
 }) {
     const [currentIdx, setCurrentIdx] = useState(0)
     const [showSubmit, setShowSubmit] = useState(false)
     const [lastViolation, setLastViolation] = useState<StudentViolation | null>(null)
     const prevViolationCount = useRef(violations.length)
+
+    const currentQ = questions[currentIdx]
+
+    // ── ZT-MPA: Cognitive Gap Integration ──
+    // Heuristic: Essay = 0.9 complexity, Short Answer = 0.6, MCQ = 0.3
+    const expectedComplexity = currentQ?.type === 'essay' ? 0.9 : currentQ?.type === 'short_answer' ? 0.6 : 0.3
+    
+    const { gapState } = useCognitiveGap({
+        faceResult: mediaPipeFace,
+        expectedComplexity,
+        enabled: true
+    })
+
+    useEffect(() => {
+        if (gapState?.aiCopilotDetected && reportViolation) {
+            reportViolation('hidden_ai_copilot', gapState.explanation)
+        }
+    }, [gapState?.aiCopilotDetected, reportViolation, gapState?.explanation])
 
     // Detect new violations -> show toast
     useEffect(() => {
@@ -732,7 +790,6 @@ function ActiveExam({
         prevViolationCount.current = violations.length
     }, [violations])
 
-    const currentQ = questions[currentIdx]
     const answeredCount = Object.keys(answers).length
     const isLowTime = examTimeRemaining < 300
     const timerColor = isLowTime ? C.redHi : C.amberHi
@@ -1207,6 +1264,8 @@ export default function ExamStudentView({
     setAnswer,
     submitExam,
     violations,
+    mediaPipeFace,
+    reportViolation
 }: Props) {
     if (examState === "waiting") {
         return <WaitingRoom />
@@ -1221,6 +1280,8 @@ export default function ExamStudentView({
                 setAnswer={setAnswer}
                 submitExam={submitExam}
                 violations={violations}
+                mediaPipeFace={mediaPipeFace}
+                reportViolation={reportViolation}
             />
         )
     }

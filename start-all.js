@@ -3,6 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import http from 'http';
 import { execSync } from 'child_process';
+import fs from 'fs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -55,7 +56,7 @@ await delay(1000);
 
 console.log('\x1b[33m  [3/5] 🌐 Checking localtunnel...\x1b[0m');
 try {
-    execSync('npx localtunnel --version', { stdio: 'pipe' });
+    execSync('npx -y localtunnel --version', { stdio: 'pipe' });
     console.log('\x1b[32m       ✅ localtunnel is ready\x1b[0m');
 } catch {
     console.log('\x1b[36m       📦 Installing localtunnel (first time only)...\x1b[0m');
@@ -89,7 +90,7 @@ try {
 
     try {
         execSync('cloudflared --version', { stdio: 'pipe' });
-        useCloudflare = true;
+        useCloudflare = false; // Forced false due to Cloudflare 530 errors
     } catch {
         console.log('\x1b[90m     cloudflared not found, using localtunnel...\x1b[0m');
     }
@@ -112,9 +113,18 @@ try {
         tunnelProcess.stdout.on('data', handleCloudflareOutput);
         tunnelProcess.stderr.on('data', handleCloudflareOutput); // CF logs to stderr
     } else {
-        // Fallback: localtunnel
-        console.log('\x1b[36m  🌐 Starting localtunnel...\x1b[0m');
-        tunnelProcess = spawn('npx', ['-y', 'localtunnel', '--port', '3000'], {
+        // Fallback: localtunnel with PERSISTENT subdomain
+        const subdomainFile = path.join(__dirname, '.tunnel_subdomain');
+        let subdomain = '';
+        if (fs.existsSync(subdomainFile)) {
+            subdomain = fs.readFileSync(subdomainFile, 'utf8').trim();
+        } else {
+            subdomain = 'meet-clone-' + Math.random().toString(36).substring(2, 12);
+            fs.writeFileSync(subdomainFile, subdomain);
+        }
+        
+        console.log(`\x1b[36m  🌐 Starting localtunnel with fixed subdomain: ${subdomain}...\x1b[0m`);
+        tunnelProcess = spawn('npx', ['-y', 'localtunnel', '--port', '3000', '--subdomain', subdomain], {
             shell: true, stdio: ['ignore', 'pipe', 'pipe']
         });
         tunnelProcess.stdout.on('data', (data) => {

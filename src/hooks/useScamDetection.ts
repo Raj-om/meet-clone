@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useRef } from "react"
+import { useState, useCallback, useRef, useEffect } from "react"
 import { bayesEngine, SensorReadings } from "@/utils/BayesianRiskEngine"
 import { examHMM, HMMState } from "@/utils/HiddenMarkovModel"
 import { examIsolationForest, IFFeatureVector } from "@/utils/IsolationForest"
@@ -68,7 +68,7 @@ function getTriggeredSignals(scores: SignalScores): ScamSignal[] {
     return (Object.keys(scores) as ScamSignal[]).filter(k => scores[k] > 50)
 }
 
-export function useScamDetection(participantId: string) {
+export function useScamDetection(participantId: string, enabled: boolean = true) {
     const [scores, setScores] = useState<SignalScores>({
         facial: 0, voice: 0, background: 0, behavioral: 0, keyword: 0, deepfake: 0,
     })
@@ -92,67 +92,68 @@ export function useScamDetection(participantId: string) {
 
     // ── Main score updater (called by every sensor hook) ─────────────────────
     const updateScore = useCallback((signal: ScamSignal, value: number) => {
-        if (!isEnabled) return
-        setScores(prev => {
-            const next = { ...prev, [signal]: Math.max(0, Math.min(100, value)) }
+        if (!enabled || !isEnabled) return
+        setScores(prev => ({
+            ...prev,
+            [signal]: Math.max(0, Math.min(100, value))
+        }))
+    }, [enabled, isEnabled])
 
-            // ── 1. Online Learner (SGD weights) ───────────────────────────
-            const olScore = onlineLearner.predict(next as unknown as Record<SignalKey, number>)
+    useEffect(() => {
+        if (!enabled || !isEnabled) return
 
-            // ── 2. Isolation Forest (anomaly detection) ───────────────────
-            const isoScore = updateIsoForest(next, lstmAnomalyRef.current)
+        // ── 1. Online Learner (SGD weights) ───────────────────────────
+        const olScore = onlineLearner.predict(scores as unknown as Record<SignalKey, number>)
 
-            // ── 3. HMM — feed Bayes score, get state trajectory ──────────
-            // First compute a raw Bayes posterior for HMM observation
-            const sensorReadings: SensorReadings = {
-                ...next,
-                lstmAnomaly: lstmAnomalyRef.current,
-                isoForestAnomaly: isoScore,
-            }
-            const { score: bayesScore, confidence, posterior } = bayesEngine.predict(sensorReadings)
-            const hmmState = examHMM.observe(bayesScore)
+        // ── 2. Isolation Forest (anomaly detection) ───────────────────
+        const isoScore = updateIsoForest(scores, lstmAnomalyRef.current)
 
-            // ── 4. Final ensemble: Bayes + HMM + IsoForest ────────────────
-            const hmmBoost = examHMM.suspicionScore  // 5 / 35 / 65 / 90
-            // Weighted ensemble: 50% Bayes, 25% HMM, 15% IsoForest, 10% Online
-            const ensembleRaw =
-                0.50 * bayesScore +
-                0.25 * hmmBoost +
-                0.15 * isoScore +
-                0.10 * olScore
-            const finalScore = Math.min(100, Math.round(ensembleRaw))
+        // ── 3. HMM — feed Bayes score, get state trajectory ──────────
+        const sensorReadings: SensorReadings = {
+            ...scores,
+            lstmAnomaly: lstmAnomalyRef.current,
+            isoForestAnomaly: isoScore,
+        }
+        const { score: bayesScore, confidence, posterior } = bayesEngine.predict(sensorReadings)
+        const hmmState = examHMM.observe(bayesScore)
 
-            setRiskScore(finalScore)
+        // ── 4. Final ensemble: Bayes + HMM + IsoForest ────────────────
+        const hmmBoost = examHMM.suspicionScore  // 5 / 35 / 65 / 90
+        const ensembleRaw =
+            0.50 * bayesScore +
+            0.25 * hmmBoost +
+            0.15 * isoScore +
+            0.10 * olScore
+        const finalScore = Math.min(100, Math.round(ensembleRaw))
 
-            setMlInsights({
-                bayesScore,
-                confidence,
-                hmmState,
-                hmmSuspicion: hmmBoost,
-                isoForestAnomaly: isoScore,
-                learnedWeights: onlineLearner.currentWeights,
-                onlineLearnScore: olScore,
-                sessionPrior: Math.round(bayesEngine.getSessionPrior() * 100) / 100,
-                violationsUsedForLearning: onlineLearner.updates,
-                lstmAnomaly: lstmAnomalyRef.current,
-            })
+        setRiskScore(finalScore)
 
-            // Alert debouncing (max 1 alert per 10s)
-            const now = Date.now()
-            if (finalScore >= ALERT_THRESHOLD && now - lastAlertRef.current > 10_000) {
-                lastAlertRef.current = now
-                const event: AlertEvent = {
-                    timestamp: now,
-                    riskScore: finalScore,
-                    triggeredSignals: getTriggeredSignals(next),
-                    participantId,
-                }
-                setAlertHistory(h => [event, ...h].slice(0, 20))
-            }
-
-            return next
+        setMlInsights({
+            bayesScore,
+            confidence,
+            hmmState,
+            hmmSuspicion: hmmBoost,
+            isoForestAnomaly: isoScore,
+            learnedWeights: onlineLearner.currentWeights,
+            onlineLearnScore: olScore,
+            sessionPrior: Math.round(bayesEngine.getSessionPrior() * 100) / 100,
+            violationsUsedForLearning: onlineLearner.updates,
+            lstmAnomaly: lstmAnomalyRef.current,
         })
-    }, [isEnabled, participantId])
+
+        const now = Date.now()
+        if (finalScore >= ALERT_THRESHOLD && now - lastAlertRef.current > 10_000) {
+            lastAlertRef.current = now
+            const triggered = Object.entries(scores).filter(([, v]) => v > 50).map(([k]) => k as ScamSignal)
+            const event: AlertEvent = {
+                timestamp: now,
+                riskScore: finalScore,
+                triggeredSignals: triggered,
+                participantId,
+            }
+            setAlertHistory(h => [event, ...h].slice(0, 20))
+        }
+    }, [scores, enabled, isEnabled, participantId])
 
     // ── Called when a violation is confirmed (strike issued) ─────────────────
     const onConfirmedViolation = useCallback((severity: "LOW" | "MEDIUM" | "HIGH") => {

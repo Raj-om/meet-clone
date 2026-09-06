@@ -134,7 +134,10 @@ export function useMediaPipeFace({
         const landmarker = await getFaceLandmarker()
         if (!landmarker) return
 
-        setIsModelLoaded(prev => prev ? prev : true)
+        setIsModelLoaded(prev => {
+            if (!prev) return true;
+            return prev;
+        })
 
         const now = performance.now()
         // Prevent same-timestamp calls (required by MediaPipe VIDEO mode)
@@ -257,7 +260,8 @@ export function useMediaPipeFace({
 
             // Very low blink rate (<5/min) = high concentration or screen staring = not necessarily bad
             // Very high (>30/min) = nervousness
-            const blinkStress = blinkRate > 30 ? 40 : blinkRate < 3 ? 20 : 0
+            const currentBlinkRate = blinkHistoryRef.current.length
+            const blinkStress = currentBlinkRate > 30 ? 40 : currentBlinkRate < 3 ? 20 : 0
 
             const finalStress = Math.min(100, Math.round(rawStress + blinkStress * 0.3))
             setStressScore(finalStress)
@@ -266,7 +270,7 @@ export function useMediaPipeFace({
         } catch (err) {
             console.warn("[useMediaPipeFace] inference error:", err)
         }
-    }, [videoRef, updateScore, blinkRate])
+    }, [videoRef, updateScore])
 
     const activeRef = useRef(false)
 

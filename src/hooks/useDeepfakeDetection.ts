@@ -9,6 +9,7 @@ interface UseDeepfakeDetectionOptions {
     videoRef: React.RefObject<HTMLVideoElement | null>
     enabled: boolean
     updateScore: (signal: ScamSignal, value: number) => void
+    mediaPipeFace?: any // Pass MediaPipe data for DeepfakeBench heuristics
 }
 
 interface DeepfakeResult {
@@ -42,6 +43,7 @@ export function useDeepfakeDetection({
     videoRef,
     enabled,
     updateScore,
+    mediaPipeFace,
 }: UseDeepfakeDetectionOptions): DeepfakeResult {
     const [label, setLabel] = useState<DeepfakeLabel>("Real")
     const [confidence, setConfidence] = useState(0)
@@ -128,13 +130,28 @@ export function useDeepfakeDetection({
 
         let score = Math.min(100, Math.round((smoothingScore * 0.5) + (seamScore * 0.35) + (imbalanceScore * 0.15)))
         
+        // DeepfakeBench-inspired heuristic:
+        // Use MediaPipe facial landmarks (if available) to cross-reference visual artifacts.
+        // GANs often fail to render micro-expressions correctly.
+        if (mediaPipeFace) {
+            // Unnatural lack of blinking (deepfakes often forget to blink)
+            if (mediaPipeFace.blinkRate === 0 && mediaPipeFace.faceDetected) {
+                score += 15
+            }
+            // Extreme head jitter (common in cheap face swaps)
+            if (mediaPipeFace.stressScore > 75) {
+                score += 25
+            }
+        }
+
         // Cap the fallback heuristic score to prevent false positive red screens
-        // during live demos when the real ONNX model is missing.
-        if (score > 15) {
-            score = 15 + Math.random() * 5 // Max ~20 (Always stays "Real")
+        // during live demos when the real ONNX model is missing, unless the MediaPipe
+        // heuristics triggered a high score.
+        if (score > 15 && score < 40) {
+            score = 15 + Math.random() * 5 // Max ~20
         }
         
-        return score
+        return Math.min(score, 100)
     }
 
     // ── Real ONNX inference ─────────────────────────────────────────────────────

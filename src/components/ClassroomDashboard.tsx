@@ -76,13 +76,14 @@ export default function ClassroomDashboard({ isHost, userId, displayName, sessio
     const active = students.filter(s => Date.now() - s.lastSeen < 10000).length
 
     const cardBase: React.CSSProperties = {
-        background: "rgba(20, 20, 35, 0.55)",
-        backdropFilter: "blur(12px)",
-        WebkitBackdropFilter: "blur(12px)",
-        border: "1px solid rgba(255,255,255,0.08)",
-        borderRadius: "14px",
-        padding: "14px",
-        marginBottom: "10px",
+        background: "rgba(11, 15, 25, 0.65)", // #0b0f19
+        backdropFilter: "blur(20px)",
+        WebkitBackdropFilter: "blur(20px)",
+        border: "1px solid rgba(255,255,255,0.06)",
+        borderRadius: "16px",
+        padding: "16px",
+        marginBottom: "12px",
+        boxShadow: "0 10px 30px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)"
     }
 
     const handleLaunchQuiz = () => {
@@ -198,7 +199,7 @@ export default function ClassroomDashboard({ isHost, userId, displayName, sessio
 
     // ── Host/Teacher View ─────────────────────────────────────────────────────
     return (
-        <div style={{ padding: "12px", color: "white", display: "flex", flexDirection: "column", gap: "10px", overflowY: "auto" }}>
+        <div style={{ padding: "16px", color: "white", display: "flex", flexDirection: "column", gap: "12px", overflowY: "auto", background: "linear-gradient(180deg, rgba(5,5,10,0.4), rgba(11,15,25,0.6))", height: "100%" }}>
             {/* Header */}
             <div style={{ ...cardBase, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>

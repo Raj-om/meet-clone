@@ -58,15 +58,16 @@ export default function SettingsModal({ onClose, onDevicesSelected }: Props) {
 
     // Mic level meter
     useEffect(() => {
-        if (activeTab !== "audio") return
+        if (activeTab !== "audio" || !selectedMic) return
+
         let stream: MediaStream
         let ctx: AudioContext
-        navigator.mediaDevices.getUserMedia({
+        navigator.mediaDevices
+            .getUserMedia({
                 audio: {
-                    deviceId: selectedMic || undefined,
+                    deviceId: selectedMic,
                     echoCancellation: true,
                     noiseSuppression: true,
-                    autoGainControl: true,
                     sampleRate: 48000,
                     channelCount: 2
                 }
@@ -80,16 +81,22 @@ export default function SettingsModal({ onClose, onDevicesSelected }: Props) {
                 source.connect(analyser)
                 analyserRef.current = analyser
                 const data = new Uint8Array(analyser.frequencyBinCount)
-                const tick = () => {
-                    analyser.getByteFrequencyData(data)
-                    const avg = data.reduce((a, b) => a + b, 0) / data.length
-                    setAudioLevel(Math.round((avg / 255) * 100))
+                
+                let lastTime = 0
+                const tick = (time: number) => {
+                    // throttle to ~10fps to avoid excessive re-renders
+                    if (time - lastTime > 100) {
+                        analyser.getByteFrequencyData(data)
+                        const avg = data.reduce((a, b) => a + b, 0) / data.length
+                        setAudioLevel(Math.round((avg / 255) * 100))
+                        lastTime = time
+                    }
                     animRef.current = requestAnimationFrame(tick)
                 }
                 animRef.current = requestAnimationFrame(tick)
             }).catch(() => { })
         return () => {
-            cancelAnimationFrame(animRef.current)
+            if (animRef.current) cancelAnimationFrame(animRef.current)
             stream?.getTracks().forEach(t => t.stop())
             ctx?.close()
         }
