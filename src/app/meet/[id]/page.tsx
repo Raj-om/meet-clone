@@ -119,8 +119,8 @@ export default function MeetingPage({ params }: { params: Promise<{ id: string }
         : null
 
     const cameraAlgosStream = useCameraAlgorithms(noiseGatedStream || localStream, {
-        autoFraming: aiOptimizationEnabled,
-        lowLightEnhancement: aiOptimizationEnabled
+        autoFraming: aiOptimizationEnabled && typeof window !== "undefined" && "FaceDetector" in window,
+        lowLightEnhancement: false
     })
 
     const { outputStream: bgStream } = useVirtualBackground(

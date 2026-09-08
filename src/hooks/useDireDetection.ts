@@ -4,7 +4,7 @@ import { useEffect, useRef, useCallback, useState } from "react"
 import { ScamSignal } from "./useScamDetection"
 
 // ── Config ────────────────────────────────────────────────────────────────────
-const DIRE_SERVER = "http://localhost:5001"
+const DIRE_SERVER = process.env.NEXT_PUBLIC_DIRE_SERVER || "/api/ai/dire-detect"
 const SAMPLE_INTERVAL = 6000    // Send a frame every 6 seconds
 const FRAME_QUALITY = 0.75    // JPEG quality for frame encoding
 const FRAME_SIZE = 224     // Resize frame before sending
@@ -35,14 +35,8 @@ interface DireResult {
 /**
  * useDireDetection
  *
- * Sends video frames to the local DIRE Flask server (localhost:5001) for
- * AI-generated content detection. The server uses:
- *
- * - DCT frequency spectrum analysis (detects diffusion model artifacts)
- * - Color statistics fingerprinting (GAN/diffusion color distributions)
- * - Optional DIRE ResNet-50 model (if weights placed in deepfake_server/models/)
- *
- * Falls back gracefully if the server is offline (no hard errors).
+ * Performs AI-generated content detection via cloud API route (/api/ai/dire-detect)
+ * or local DIRE Python server.
  */
 export function useDireDetection({
     videoRef,
@@ -51,11 +45,11 @@ export function useDireDetection({
 }: UseDireDetectionOptions): DireResult {
     const [label, setLabel] = useState<DireLabel>("Likely Real")
     const [score, setScore] = useState(0)
-    const [mode, setMode] = useState("DCT Heuristic")
+    const [mode, setMode] = useState("DIRE DCT Engine (Cloud Native)")
     const [dctScore, setDctScore] = useState(0)
     const [colorScore, setColorScore] = useState(0)
     const [direScore, setDireScore] = useState<number | null>(null)
-    const [serverOnline, setServerOnline] = useState(false)
+    const [serverOnline, setServerOnline] = useState(true)
     const [isAnalyzing, setIsAnalyzing] = useState(false)
 
     const canvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -65,13 +59,14 @@ export function useDireDetection({
     // ── Check server health ───────────────────────────────────────────────────
     const checkServer = useCallback(async () => {
         try {
-            const res = await fetch(`${DIRE_SERVER}/health`, {
-                signal: AbortSignal.timeout(2000)
+            const url = DIRE_SERVER.startsWith("http") ? `${DIRE_SERVER}/health` : DIRE_SERVER
+            const res = await fetch(url, {
+                signal: AbortSignal.timeout(3000)
             })
             if (res.ok) {
                 const data = await res.json()
                 setServerOnline(true)
-                setMode(data.mode || "DCT Heuristic")
+                setMode(data.mode || "DIRE DCT Engine (Cloud Native)")
                 return true
             }
         } catch {
@@ -99,7 +94,8 @@ export function useDireDetection({
 
         setIsAnalyzing(true)
         try {
-            const res = await fetch(`${DIRE_SERVER}/analyze`, {
+            const url = DIRE_SERVER.startsWith("http") ? `${DIRE_SERVER}/analyze` : DIRE_SERVER
+            const res = await fetch(url, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ frame: frameB64 }),

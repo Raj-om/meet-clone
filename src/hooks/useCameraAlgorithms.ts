@@ -38,8 +38,9 @@ export const useCameraAlgorithms = (
             return;
         }
 
-        // If no algorithms are enabled, return the raw stream
-        if (!options.autoFraming && !options.lowLightEnhancement) {
+        // If no algorithms are enabled or supported, return the raw stream directly
+        const canAutoFrame = Boolean(options.autoFraming && typeof window !== "undefined" && "FaceDetector" in window);
+        if (!canAutoFrame && !options.lowLightEnhancement) {
             setProcessedStream(rawStream);
             return;
         }
@@ -56,66 +57,64 @@ export const useCameraAlgorithms = (
         const ctx = canvas.getContext("2d", { willReadFrequently: true });
         canvasRef.current = canvas;
 
-        // Native FaceDetector (supported in Chrome/Edge via flags or origin trials)
-        // Fallback to center frame if not available
         let faceDetector: any = null;
-        if (typeof window !== "undefined" && 'FaceDetector' in window) {
+        if (canAutoFrame) {
             try {
                 // @ts-expect-error
                 faceDetector = new window.FaceDetector({ fastMode: true, maxDetectedFaces: 1 });
             } catch (e) {
-                console.warn("FaceDetector API not fully supported.");
+                console.warn("FaceDetector API not available.");
             }
         }
 
         let lastDetectionTime = 0;
 
         const setupAndStart = () => {
-            canvas.width = video.videoWidth || 640;
-            canvas.height = video.videoHeight || 480;
+            const width = video.videoWidth || 640;
+            const height = video.videoHeight || 480;
+            canvas.width = width;
+            canvas.height = height;
+
+            const initialSize = Math.min(width, height);
+            targetCropRef.current = { x: 0, y: 0, size: initialSize };
+            currentCropRef.current = { x: 0, y: 0, size: initialSize };
 
             // Start processing loop
             const processFrame = async () => {
                 if (!ctx || !video) return;
 
-                const width = canvas.width;
-                const height = canvas.height;
+                const curW = canvas.width;
+                const curH = canvas.height;
 
-                // 1. Auto-Framing Algorithm
-                if (options.autoFraming && faceDetector && performance.now() - lastDetectionTime > 500) {
+                // 1. Auto-Framing Algorithm (only if FaceDetector is actually present)
+                if (faceDetector && performance.now() - lastDetectionTime > 500) {
                     lastDetectionTime = performance.now();
                     try {
                         const faces = await faceDetector.detect(video);
                         if (faces.length > 0) {
                             const face = faces[0].boundingBox;
-                            // Calculate target crop to keep face centered
                             const faceCenterX = face.x + face.width / 2;
                             const faceCenterY = face.y + face.height / 2;
                             
-                            // Target a crop size that is roughly 2x the face size, bounded by screen
                             let targetSize = Math.max(face.width, face.height) * 2.5;
-                            targetSize = Math.min(targetSize, Math.min(width, height));
+                            targetSize = Math.min(targetSize, Math.min(curW, curH));
                             
                             let targetX = faceCenterX - targetSize / 2;
                             let targetY = faceCenterY - targetSize / 2;
 
-                            // Constrain bounds
-                            targetX = Math.max(0, Math.min(targetX, width - targetSize));
-                            targetY = Math.max(0, Math.min(targetY, height - targetSize));
+                            targetX = Math.max(0, Math.min(targetX, curW - targetSize));
+                            targetY = Math.max(0, Math.min(targetY, curH - targetSize));
 
                             targetCropRef.current = { x: targetX, y: targetY, size: targetSize };
                         } else {
-                            // Reset to full frame if no face
-                            targetCropRef.current = { x: 0, y: 0, size: Math.min(width, height) };
+                            targetCropRef.current = { x: 0, y: 0, size: Math.min(curW, curH) };
                         }
-                    } catch (e) {
-                        // Ignore detection errors
+                    } catch {
+                        targetCropRef.current = { x: 0, y: 0, size: Math.min(curW, curH) };
                     }
-                } else if (!options.autoFraming) {
-                    targetCropRef.current = { x: 0, y: 0, size: Math.min(width, height) };
                 }
 
-                // Smoothly interpolate current crop to target crop (easing)
+                // Smoothly interpolate current crop
                 const c = currentCropRef.current;
                 const t = targetCropRef.current;
                 c.x += (t.x - c.x) * 0.1;
@@ -124,21 +123,20 @@ export const useCameraAlgorithms = (
 
                 // 2. Low-Light Enhancement Algorithm
                 if (options.lowLightEnhancement) {
-                    // Simple heuristic: bump brightness and contrast slightly if enabled
                     ctx.filter = 'brightness(1.2) contrast(1.1)';
                 } else {
                     ctx.filter = 'none';
                 }
 
-                // 3. Draw the frame (with crop if auto-framing)
-                if (options.autoFraming) {
+                // 3. Draw the frame (only crop if faceDetector is active and crop size is valid)
+                if (faceDetector && c.size > 50) {
                     ctx.drawImage(
                         video, 
-                        c.x, c.y, c.size, c.size, // Source crop
-                        0, 0, width, height       // Destination (stretch to full canvas)
+                        c.x, c.y, c.size, c.size,
+                        0, 0, curW, curH
                     );
                 } else {
-                    ctx.drawImage(video, 0, 0, width, height);
+                    ctx.drawImage(video, 0, 0, curW, curH);
                 }
 
                 animationFrameRef.current = requestAnimationFrame(processFrame);
