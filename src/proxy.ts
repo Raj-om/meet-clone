@@ -11,7 +11,7 @@ export async function proxy(request: NextRequest) {
     response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
     response.headers.set('X-XSS-Protection', '1; mode=block');
 
-    const clientIp = request.ip || 'unknown';
+    const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0] || request.headers.get('x-real-ip') || 'unknown';
     if (clientIp === '0.0.0.0') { // Simulated malicious IP
         return new NextResponse('Access Denied by Edge Firewall', { status: 403 });
     }

@@ -26,7 +26,7 @@ function DataStream({ radius, color, count, speed, direction = 1, size = 0.08 }:
     return (
         <points ref={pointsRef}>
             <bufferGeometry>
-                <bufferAttribute attach="attributes-position" count={count} array={positions} itemSize={3} />
+                <bufferAttribute attach="attributes-position" args={[positions, 3]} count={count} array={positions} itemSize={3} />
             </bufferGeometry>
             <pointsMaterial size={size} color={color} transparent opacity={1} blending={THREE.AdditiveBlending} />
         </points>
@@ -141,6 +141,7 @@ function SolarFlares({ count = 300, color = "#ff007f" }) {
             <bufferGeometry>
                 <bufferAttribute
                     attach="attributes-position"
+                    args={[positions, 3]}
                     count={positions.length / 3}
                     array={positions}
                     itemSize={3}

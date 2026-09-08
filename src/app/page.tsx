@@ -235,15 +235,19 @@ export default function Home() {
     });
   };
 
-  const joinMeeting = (e: React.MouseEvent<HTMLButtonElement>) => {
+  const joinMeeting = (e?: React.MouseEvent<HTMLButtonElement>) => {
     const code = meetingCode.trim().replace(/[^a-zA-Z0-9]/g, "");
     if (!code) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const ox = rect.left + rect.width / 2;
-    const oy = rect.top + rect.height / 2;
-    triggerThunder(ox, oy, () => {
+    if (e?.currentTarget) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const ox = rect.left + rect.width / 2;
+      const oy = rect.top + rect.height / 2;
+      triggerThunder(ox, oy, () => {
+        router.push(`/meet/${code}/lobby`);
+      });
+    } else {
       router.push(`/meet/${code}/lobby`);
-    });
+    }
   };
 
   const installApp = async () => {

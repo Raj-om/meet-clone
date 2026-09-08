@@ -20,7 +20,7 @@ export const useCameraAlgorithms = (
     const [processedStream, setProcessedStream] = useState<MediaStream | null>(null);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const videoRef = useRef<HTMLVideoElement | null>(null);
-    const animationFrameRef = useRef<number>();
+    const animationFrameRef = useRef<number | null>(null);
     
     // Auto-framing state (smoothing)
     const targetCropRef = useRef({ x: 0, y: 0, size: 1 });
@@ -147,8 +147,7 @@ export const useCameraAlgorithms = (
             processFrame();
 
             // Extract the processed stream
-            // @ts-expect-error - captureStream exists on canvas
-            const outStream = canvas.captureStream(30) as MediaStream;
+            const outStream = (canvas as unknown as { captureStream: (fps?: number) => MediaStream }).captureStream(30);
             
             // Add original audio tracks back
             rawStream.getAudioTracks().forEach(track => {

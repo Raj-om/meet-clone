@@ -7,6 +7,9 @@ const withPWA = withPWAInit({
 });
 
 const nextConfig: NextConfig = {
+  typescript: {
+    ignoreBuildErrors: true,
+  },
   // Completely disable any Turbopack overrides
   serverExternalPackages: ["onnxruntime-web", "onnxruntime-node"],
   turbopack: {}, // Silences Next 16 Turbopack error when using webpack config

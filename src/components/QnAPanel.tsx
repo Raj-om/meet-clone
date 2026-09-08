@@ -140,3 +140,5 @@ export function QnAPanel({
         </div>
     );
 }
+
+export default QnAPanel;
