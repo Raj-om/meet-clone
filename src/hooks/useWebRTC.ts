@@ -18,6 +18,8 @@ export const useWebRTC = (roomId: string, userId: string) => {
 
     useEffect(() => {
         let isMounted = true
+        let currentLocalStream: MediaStream | null = null
+
         const room = new Room({
             adaptiveStream: true,
             dynacast: true,
@@ -28,49 +30,52 @@ export const useWebRTC = (roomId: string, userId: string) => {
         socketRef.current = io()
         socketRef.current.emit("join-room", roomId, userId)
 
+        // 1. Start Local Camera immediately upon mount (never wait for LiveKit connection)
+        const initLocalCamera = async () => {
+            const isCompanion = sessionStorage.getItem("meet-companion-mode") === "true";
+            if (isCompanion) {
+                if (isMounted) setLocalStream(new MediaStream());
+                return null;
+            }
+            try {
+                const stream = await cameraManager.getStream();
+                currentLocalStream = stream;
+                if (isMounted && stream.getTracks().length > 0) {
+                    setLocalStream(stream);
+                }
+                return stream;
+            } catch (err) {
+                console.warn("Direct camera access failed:", err);
+                return null;
+            }
+        };
+
         const connectToLiveKit = async () => {
             try {
-                // 1. Fetch secure JWT Token
-                const tokenRes = await fetch(`/api/livekit/get-token?room=${roomId}&username=${userId}`)
-                const { token } = await tokenRes.json()
+                // Ensure camera is getting initialized
+                const cameraPromise = currentLocalStream ? Promise.resolve(currentLocalStream) : initLocalCamera();
 
-                if (!token) throw new Error("Failed to get LiveKit token")
+                // Fetch secure JWT Token
+                const tokenRes = await fetch(`/api/livekit/get-token?room=${roomId}&username=${userId}`);
+                if (!tokenRes.ok) throw new Error("Failed to get LiveKit token");
+                const { token } = await tokenRes.json();
 
-                // 2. Connect to LiveKit Enterprise Server
-                // Note: process.env is only available in node, so we use the hardcoded string or NEXT_PUBLIC_
-                const livekitUrl = "wss://meet-clone-h7gsuvxw.livekit.cloud"
-                await room.connect(livekitUrl, token)
+                if (!token) throw new Error("Missing LiveKit token");
 
-                // 3. Setup Local Media Streams
-                const isCompanion = sessionStorage.getItem("meet-companion-mode") === "true";
+                // Connect to LiveKit Enterprise Server
+                const livekitUrl = "wss://meet-clone-h7gsuvxw.livekit.cloud";
+                await room.connect(livekitUrl, token);
 
-                if (!isCompanion) {
-                    const stream = await cameraManager.getStream();
-                    
-                    try {
-                        const videoTracks = stream.getVideoTracks();
-                        if (videoTracks.length > 0) {
-                            await room.localParticipant.publishTrack(videoTracks[0]);
-                        }
-                    } catch (e) {
-                        console.warn("Failed to publish video track:", e);
+                const stream = await cameraPromise;
+                if (stream) {
+                    const videoTracks = stream.getVideoTracks();
+                    if (videoTracks.length > 0) {
+                        await room.localParticipant.publishTrack(videoTracks[0]).catch(e => console.warn(e));
                     }
-
-                    try {
-                        const audioTracks = stream.getAudioTracks();
-                        if (audioTracks.length > 0) {
-                            await room.localParticipant.publishTrack(audioTracks[0]);
-                        }
-                    } catch (e) {
-                        console.warn("Failed to publish audio track:", e);
+                    const audioTracks = stream.getAudioTracks();
+                    if (audioTracks.length > 0) {
+                        await room.localParticipant.publishTrack(audioTracks[0]).catch(e => console.warn(e));
                     }
-                    
-                    if (stream.getTracks().length > 0 && isMounted) {
-                        setLocalStream(stream);
-                    }
-                } else {
-                    // Provide empty stream for Companion mode to prevent null errors in UI
-                    if (isMounted) setLocalStream(new MediaStream());
                 }
 
                 // 4. Map Remote LiveKit Tracks back into standard MediaStreams for the AI Models

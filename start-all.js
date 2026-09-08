@@ -52,16 +52,14 @@ console.log('\x1b[33m  [2/5] 🧠 Starting Ollama DeepSeek AI...\x1b[0m');
 exec('start "🧠 Ollama DeepSeek AI" cmd.exe /k "set OLLAMA_ORIGINS=* && ollama serve"');
 await delay(1000);
 
-// ── Step 3: Ensure localtunnel is installed ───────────────────────────────────
+// ── Step 3: Ensure ngrok is ready ───────────────────────────────────────────
 
-console.log('\x1b[33m  [3/5] 🌐 Checking localtunnel...\x1b[0m');
+console.log('\x1b[33m  [3/5] 🌐 Checking ngrok...\x1b[0m');
 try {
-    execSync('npx -y localtunnel --version', { stdio: 'pipe' });
-    console.log('\x1b[32m       ✅ localtunnel is ready\x1b[0m');
+    execSync('ngrok --version', { stdio: 'pipe' });
+    console.log('\x1b[32m       ✅ ngrok is ready\x1b[0m');
 } catch {
-    console.log('\x1b[36m       📦 Installing localtunnel (first time only)...\x1b[0m');
-    try { execSync('npm install -g localtunnel', { stdio: 'inherit' }); }
-    catch { console.log('\x1b[31m       ⚠️  Could not install globally, will use npx\x1b[0m'); }
+    console.log('\x1b[33m       ⚠️ ngrok not found, will use localtunnel as fallback\x1b[0m');
 }
 
 // ── Step 4: Next.js Server ────────────────────────────────────────────────────
@@ -79,39 +77,63 @@ nextDev.on('close', (code) => {
     process.exit(code);
 });
 
-// ── Step 5: Tunnel (Cloudflare preferred, localtunnel fallback) ───────────────
+// ── Step 5: Tunnel (ngrok primary, localtunnel fallback) ─────────────────────
 
 console.log('\x1b[33m  [5/5] 🌐 Waiting for Next.js, then launching public tunnel...\x1b[0m');
 
 try {
-    // Try Cloudflare Tunnel first (most reliable, never 503)
     let tunnelProcess;
-    let useCloudflare = false;
+    let hasNgrok = false;
 
     try {
-        execSync('cloudflared --version', { stdio: 'pipe' });
-        useCloudflare = false; // Forced false due to Cloudflare 530 errors
+        execSync('ngrok --version', { stdio: 'pipe' });
+        hasNgrok = true;
     } catch {
-        console.log('\x1b[90m     cloudflared not found, using localtunnel...\x1b[0m');
+        console.log('\x1b[90m     ngrok not found, using localtunnel...\x1b[0m');
     }
 
-    if (useCloudflare) {
-        console.log('\x1b[36m  ☁️  Starting Cloudflare Tunnel (using HTTP2 due to firewall)... this may take 10-20 seconds to establish.\x1b[0m');
-        tunnelProcess = spawn('cloudflared', ['tunnel', '--url', 'http://localhost:3000', '--protocol', 'http2'], {
+    if (hasNgrok) {
+        console.log('\x1b[36m  🚀 Starting ngrok tunnel on port 3000...\x1b[0m');
+        tunnelProcess = spawn('ngrok', ['http', '3000', '--log=stdout'], {
             shell: true, stdio: ['ignore', 'pipe', 'pipe']
         });
 
-        const handleCloudflareOutput = (data) => {
+        let urlFound = false;
+        const handleNgrokOutput = (data) => {
+            if (urlFound) return;
             const out = data.toString();
-            const match = out.match(/https:\/\/[a-z0-9\-]+\.trycloudflare\.com/);
+            const match = out.match(/url=(https:\/\/[a-zA-Z0-9\.\-]+ngrok[^\s"']+)/i) || out.match(/(https:\/\/[a-zA-Z0-9\.\-]+\.ngrok[^\s"']+)/i);
             if (match) {
-                const url = match[0].trim();
+                urlFound = true;
+                const url = match[1].trim().replace(/["',]/g, '');
                 copyToClipboard(url);
                 printSuccessBanner(url);
             }
         };
-        tunnelProcess.stdout.on('data', handleCloudflareOutput);
-        tunnelProcess.stderr.on('data', handleCloudflareOutput); // CF logs to stderr
+
+        tunnelProcess.stdout.on('data', handleNgrokOutput);
+        tunnelProcess.stderr.on('data', handleNgrokOutput);
+
+        // API polling fallback
+        const pollInterval = setInterval(async () => {
+            if (urlFound) {
+                clearInterval(pollInterval);
+                return;
+            }
+            try {
+                const res = await fetch('http://127.0.0.1:4040/api/tunnels');
+                if (res.ok) {
+                    const json = await res.json();
+                    const publicUrl = json.tunnels?.[0]?.public_url;
+                    if (publicUrl) {
+                        urlFound = true;
+                        clearInterval(pollInterval);
+                        copyToClipboard(publicUrl);
+                        printSuccessBanner(publicUrl);
+                    }
+                }
+            } catch {}
+        }, 1000);
     } else {
         // Fallback: localtunnel with PERSISTENT subdomain
         const subdomainFile = path.join(__dirname, '.tunnel_subdomain');

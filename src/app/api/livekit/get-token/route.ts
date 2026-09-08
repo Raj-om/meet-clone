@@ -13,9 +13,9 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: 'Missing "username" query parameter' }, { status: 400 })
     }
 
-    const apiKey = process.env.LIVEKIT_API_KEY
-    const apiSecret = process.env.LIVEKIT_API_SECRET
-    const wsUrl = process.env.LIVEKIT_URL
+    const apiKey = process.env.LIVEKIT_API_KEY || "API8gphux6Hh6H8"
+    const apiSecret = process.env.LIVEKIT_API_SECRET || "5jfv7ZtFiU5nYSVWandPFyAgutBfhVV8fABhOfheosKC"
+    const wsUrl = process.env.LIVEKIT_URL || "wss://meet-clone-h7gsuvxw.livekit.cloud"
 
     if (!apiKey || !apiSecret || !wsUrl) {
         return NextResponse.json({ error: "Server misconfigured" }, { status: 500 })

@@ -24,7 +24,8 @@ const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(
 
         useEffect(() => {
             if (videoRef.current && stream) {
-                videoRef.current.srcObject = stream
+                videoRef.current.srcObject = stream;
+                videoRef.current.play().catch(() => {});
             }
         }, [stream, videoRef])
 

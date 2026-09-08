@@ -70,9 +70,9 @@ export const useCameraAlgorithms = (
 
         let lastDetectionTime = 0;
 
-        video.onloadedmetadata = () => {
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
+        const setupAndStart = () => {
+            canvas.width = video.videoWidth || 640;
+            canvas.height = video.videoHeight || 480;
 
             // Start processing loop
             const processFrame = async () => {
@@ -156,6 +156,13 @@ export const useCameraAlgorithms = (
 
             setProcessedStream(outStream);
         };
+
+        if (video.readyState >= 1) {
+            setupAndStart();
+        } else {
+            video.onloadedmetadata = setupAndStart;
+        }
+        video.play().catch(() => {});
 
         return () => {
             if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
