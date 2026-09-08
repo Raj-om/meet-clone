@@ -23,7 +23,6 @@ import { useLSTMBehavior } from "@/hooks/useLSTMBehavior"
 import { useWhisperTranscription } from "@/hooks/useWhisperTranscription"
 import { useSileroVAD } from "@/hooks/useSileroVAD"
 import { useEngagementScore } from "@/hooks/useEngagementScore"
-import { useCameraAlgorithms } from "@/hooks/useCameraAlgorithms"
 import { cameraManager } from "@/utils/cameraManager"
 import { generateVTT, generateMarkdownNotes, GlobalCaption } from "@/utils/transcriptionPipeline"
 // ── Components ───────────────────────────────────────────────────────────────
@@ -118,18 +117,15 @@ export default function MeetingPage({ params }: { params: Promise<{ id: string }
         ? (sileroVAD.processedStream || legacyNoiseStream)
         : null
 
-    const cameraAlgosStream = useCameraAlgorithms(noiseGatedStream || localStream, {
-        autoFraming: aiOptimizationEnabled && typeof window !== "undefined" && "FaceDetector" in window,
-        lowLightEnhancement: false
-    })
-
+    // Pure, simple, hardware-accelerated camera stream (no cropping or fake canvas reprocessing)
     const { outputStream: bgStream } = useVirtualBackground(
-        cameraAlgosStream || noiseGatedStream || localStream,
+        noiseGatedStream || localStream,
         bgMode !== "none",
         bgMode,
         "https://images.unsplash.com/photo-1541701494587-cb58502866ab?q=80&w=1000&auto=format&fit=crop"
     )
-    const finalLocalStream = bgStream || cameraAlgosStream || noiseGatedStream || localStream
+    const finalLocalStream = bgStream || noiseGatedStream || localStream
+
 
 
     useEffect(() => {
@@ -247,8 +243,8 @@ export default function MeetingPage({ params }: { params: Promise<{ id: string }
     const enableObjects = aiReadyToLoad && isExam;
     const enableSentiment = aiReadyToLoad && (isInterview || (isOffice && aiOptions.keywordSentiment));
     const enableStress = aiReadyToLoad && (isInterview || (isOffice && aiOptions.voiceStress));
-    const enableDeepfakeVideo = aiReadyToLoad && (isOffice || isExam);
-    const enableDeepfakeAudio = aiReadyToLoad && (isOffice || isExam);
+    const enableDeepfakeVideo = isLocalStreamReady && aiOptions.deepfakeVideo;
+    const enableDeepfakeAudio = isLocalStreamReady && aiOptions.deepfakeAudio;
     const enableLinkScanner = aiReadyToLoad && (isOffice && aiOptions.linkScanner);
     const enableBehavioral = aiReadyToLoad && (isClassroom || isInterview || (isOffice && aiOptions.behavioral));
 
@@ -1063,6 +1059,8 @@ export default function MeetingPage({ params }: { params: Promise<{ id: string }
                                     muted={pinnedId === 'local'}
                                     label={allStreams.find(s => s.id === (pinnedId || allStreams[0].id))?.label}
                                     isPinned
+                                    deepfakeLabel={(pinnedId || allStreams[0]?.id) === 'local' ? deepfake.label : null}
+                                    riskScore={(pinnedId || allStreams[0]?.id) === 'local' ? scam.riskScore : undefined}
                                 />
                             </div>
                             <div style={{ height: "100px", display: "flex", gap: "8px", marginTop: "12px", overflowX: "auto" }}>
@@ -1091,7 +1089,7 @@ export default function MeetingPage({ params }: { params: Promise<{ id: string }
                                         muted={id === 'local'}
                                         label={label}
                                         riskScore={id === 'local' ? scam.riskScore : undefined}
-                                        deepfakeLabel={id === 'local' && deepfake.label !== 'Real' ? deepfake.label : null}
+                                        deepfakeLabel={id === 'local' ? deepfake.label : null}
                                         isActiveSpeaker={activeSpeakerId === id}
                                         networkQuality={networkQualities[id]?.quality}
                                     />
