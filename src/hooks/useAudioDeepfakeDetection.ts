@@ -216,7 +216,7 @@ export function useAudioDeepfakeDetection({
                     : "Natural Voice"
 
         if (process.env.NODE_ENV !== "test") {
-            console.log(`🎙️ [AI Defense - Audio] Voice Score: ${finalScore}% | Status: ${newLabel} | Floor: ${Math.round(floorDb)}dB`)
+            console.log(`🎙️ [AI Defense - Audio] Voice Score: ${finalScore}% | Status: ${newLabel} | Floor: ${Math.round(floor)}dB`)
         }
 
         setScore(finalScore)

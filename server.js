@@ -30,6 +30,8 @@ const qnaSessions = {};
 // ── Server-authoritative host registry ──────────────────────────────────────
 // roomHosts[roomId] = userId  — ONLY set when user joins; never overridden by client
 const roomHosts = {};
+// roomModes[roomId] = 'office' | 'classroom' | 'interview' | 'exam'
+const roomModes = {};
 
 // ── Rate limiting ────────────────────────────────────────────────────────────
 // rateLimits[socketId][event] = [timestamps...]
@@ -247,6 +249,9 @@ app.prepare().then(() => {
 
             // Confirm host status back to the joining client
             socket.emit("host-confirmed", { isHost, hostUserId: roomHosts[roomId] });
+            if (roomModes[roomId]) {
+                socket.emit("mode-select", roomModes[roomId]);
+            }
 
             socket.to(roomId).emit("user-connected", userId);
 
@@ -337,6 +342,15 @@ app.prepare().then(() => {
         socket.on("caption", (cap) => {
             if (!currentRoom) return;
             socket.to(currentRoom).emit("caption", cap);
+        });
+
+        // ── Session Mode Selection ─────────────────────────────────────────────
+        socket.on("mode-select", (mode) => {
+            const roomId = currentRoom;
+            if (!roomId) return;
+            roomModes[roomId] = mode;
+            io.to(roomId).emit("mode-select", mode);
+            console.log(`[SESSION MODE] Room ${roomId} set to mode: ${mode}`);
         });
 
         // ── Participant status updates ────────────────────────────────────────

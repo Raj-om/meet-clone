@@ -666,7 +666,10 @@ export default function MeetingPage({ params }: { params: Promise<{ id: string }
                 setRoomMode(mode)
                 if (socket) socket.emit("mode-select", mode)
             }}
-            onSkip={() => setRoomMode('office')}
+            onSkip={() => {
+                setRoomMode('office')
+                if (socket) socket.emit("mode-select", 'office')
+            }}
         />
     }
 

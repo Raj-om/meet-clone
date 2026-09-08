@@ -38,10 +38,22 @@ class CameraManager {
 
         this.acquiringPromise = new Promise(async (resolve, reject) => {
             try {
-                const s = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: "user" }, 
-                    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } 
-                });
+                let s: MediaStream | null = null;
+                // Strategy 1: User-facing camera + noise-suppressed audio
+                try {
+                    s = await navigator.mediaDevices.getUserMedia({ 
+                        video: { facingMode: "user" }, 
+                        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } 
+                    });
+                } catch (e1) {
+                    // Strategy 2: Default video + default audio (standard webcams on PC)
+                    try {
+                        s = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                    } catch (e2) {
+                        // Strategy 3: Video only (in case mic is blocked or in use)
+                        s = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                    }
+                }
                 this.stream = s;
                 resolve(s);
             } catch (err) {
