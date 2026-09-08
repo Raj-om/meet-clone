@@ -125,7 +125,14 @@ function upsertGraphEdge(roomId, participants) {
 const breakoutRooms = {};
 
 app.prepare().then(() => {
-    const httpServer = createServer(handler);
+    const httpServer = createServer((req, res) => {
+        if (req.url === "/api/health" || req.url === "/health") {
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ status: "healthy", service: "CLARIVOX Meet Clone", timestamp: new Date().toISOString() }));
+            return;
+        }
+        handler(req, res);
+    });
     const io = new Server(httpServer);
     // 🛡️ LAYER 3: BEHAVIORAL AI FIREWALL 🛡️
     const ipBlacklist = new Set();
