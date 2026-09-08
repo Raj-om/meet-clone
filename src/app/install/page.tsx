@@ -109,45 +109,21 @@ export default function InstallPage() {
               <circle cx="9" cy="12" r="2.5" fill="#7c3aed"/>
             </svg>
           </div>
-          <h1 style={{ fontSize: "28px", fontWeight: 800, marginBottom: "8px", letterSpacing: "-0.5px" }}>Install MeetAI</h1>
+          <h1 style={{ fontSize: "28px", fontWeight: 800, marginBottom: "8px", letterSpacing: "-0.5px" }}>Install CLARIVOX</h1>
           <p style={{ color: "rgba(255,255,255,0.6)", fontSize: "15px", margin: 0 }}>
-            Install our secure app directly to your device. No app store required.
+            Install our secure AI communication platform directly to your device home screen. No app store or APK download required.
           </p>
         </div>
 
-        {/* Direct APK Download Button */}
-        <div style={{ marginBottom: "24px" }}>
-          <a
-            href="/meet.apk"
-            download="MeetCloneApp.apk"
-            style={{
-              width: "100%", padding: "16px", borderRadius: "16px",
-              background: "linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)",
-              border: "none", color: "white", fontSize: "16px", fontWeight: 700,
-              display: "flex", alignItems: "center", justifyContent: "center", gap: "10px",
-              boxShadow: "0 8px 24px rgba(124,58,237,0.4), inset 0 2px 0 rgba(255,255,255,0.2)",
-              textDecoration: "none", boxSizing: "border-box", transition: "transform 0.1s"
-            }}
-            onMouseDown={e => e.currentTarget.style.transform = "scale(0.98)"}
-            onMouseUp={e => e.currentTarget.style.transform = "scale(1)"}
-          >
-            <IconAndroid />
-            Download Android APK (Direct)
-          </a>
-          <div style={{ textAlign: "center", marginTop: "8px", fontSize: "12px", color: "rgba(255,255,255,0.5)" }}>
-            Direct installable APK · Size: 4.1 MB · Works on all Android phones
-          </div>
-        </div>
-
-        {/* Browser Auto-Install Button */}
+        {/* Browser Auto-Install Button (when prompt is available) */}
         {installPrompt && !installed && (
-          <div style={{ marginBottom: "32px" }}>
+          <div style={{ marginBottom: "28px" }}>
             <button onClick={handleInstall} style={{
               width: "100%", padding: "18px", borderRadius: "16px",
-              background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+              background: "linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)",
               border: "none", color: "white", fontSize: "16px", fontWeight: 700,
               cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px",
-              boxShadow: "0 8px 24px rgba(16,185,129,0.4), inset 0 2px 0 rgba(255,255,255,0.2)",
+              boxShadow: "0 8px 24px rgba(124,58,237,0.4), inset 0 2px 0 rgba(255,255,255,0.2)",
               transition: "transform 0.1s"
             }}
             onMouseDown={e => e.currentTarget.style.transform = "scale(0.98)"}
@@ -157,10 +133,10 @@ export default function InstallPage() {
                 <polyline points="7 10 12 15 17 10"/>
                 <line x1="12" y1="15" x2="12" y2="3"/>
               </svg>
-              Install App Automatically
+              Install CLARIVOX App (One-Click)
             </button>
-            <div style={{ textAlign: "center", marginTop: "12px", fontSize: "13px", color: "rgba(255,255,255,0.4)" }}>
-              Supported on your current browser
+            <div style={{ textAlign: "center", marginTop: "12px", fontSize: "13px", color: "rgba(255,255,255,0.5)" }}>
+              Instant Progressive Web App · 0 MB Storage · Real-time AI Defense
             </div>
           </div>
         )}
@@ -173,7 +149,7 @@ export default function InstallPage() {
           }}>
             <div style={{ fontSize: "40px", marginBottom: "12px" }}>🎉</div>
             <h3 style={{ margin: "0 0 6px", fontSize: "18px" }}>Successfully Installed!</h3>
-            <p style={{ margin: 0, fontSize: "14px", opacity: 0.8 }}>Check your home screen or app drawer for the MeetAI app.</p>
+            <p style={{ margin: 0, fontSize: "14px", opacity: 0.8 }}>Check your home screen or app drawer for the CLARIVOX app.</p>
           </div>
         )}
 
