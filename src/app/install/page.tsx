@@ -115,6 +115,30 @@ export default function InstallPage() {
           </p>
         </div>
 
+        {/* Direct APK Download Button */}
+        <div style={{ marginBottom: "24px" }}>
+          <a
+            href="/meet.apk"
+            download="MeetCloneApp.apk"
+            style={{
+              width: "100%", padding: "16px", borderRadius: "16px",
+              background: "linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)",
+              border: "none", color: "white", fontSize: "16px", fontWeight: 700,
+              display: "flex", alignItems: "center", justifyContent: "center", gap: "10px",
+              boxShadow: "0 8px 24px rgba(124,58,237,0.4), inset 0 2px 0 rgba(255,255,255,0.2)",
+              textDecoration: "none", boxSizing: "border-box", transition: "transform 0.1s"
+            }}
+            onMouseDown={e => e.currentTarget.style.transform = "scale(0.98)"}
+            onMouseUp={e => e.currentTarget.style.transform = "scale(1)"}
+          >
+            <IconAndroid />
+            Download Android APK (Direct)
+          </a>
+          <div style={{ textAlign: "center", marginTop: "8px", fontSize: "12px", color: "rgba(255,255,255,0.5)" }}>
+            Direct installable APK · Size: 4.1 MB · Works on all Android phones
+          </div>
+        </div>
+
         {/* Browser Auto-Install Button */}
         {installPrompt && !installed && (
           <div style={{ marginBottom: "32px" }}>
