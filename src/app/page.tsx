@@ -24,51 +24,51 @@ const ArrowIcon = (p: IconProps) => (
   <svg viewBox="0 0 24 24" fill="none" {...p}><path d="M5 12h14m-5-5 5 5-5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="square" strokeLinejoin="miter" /></svg>
 );
 
-// ── Cinematic Bollywood Volcano Logo ───────────────────────────────────
+// ── Clarivox Brand Logo ───────────────────────────────────
 function VolcanoLogo() {
   return (
     <motion.div
-      initial={{ y: 50, scale: 0.5, rotateX: 60, opacity: 0 }}
-      animate={{ y: 0, scale: 1, rotateX: 0, opacity: 1 }}
+      initial={{ y: 20, scale: 0.8, opacity: 0 }}
+      animate={{ y: 0, scale: 1, opacity: 1 }}
       transition={{ 
-        duration: 1.5, 
+        duration: 0.8, 
         ease: "easeOut",
-        type: "spring", stiffness: 100, damping: 10
+        type: "spring", stiffness: 100, damping: 12
       }}
-      style={{ position: "relative", perspective: 1000 }}
+      style={{ display: "flex", alignItems: "center", gap: 10 }}
     >
+      <img
+        src="/clarivox-logo.png"
+        alt="CLARIVOX"
+        style={{
+          width: 30,
+          height: 30,
+          borderRadius: 8,
+          boxShadow: "0 0 15px rgba(124,58,237,0.8)",
+          flexShrink: 0
+        }}
+      />
       <motion.span
         animate={{ 
           textShadow: [
-            "0px 5px 15px rgba(255, 60, 0, 0.8), 0px -2px 10px rgba(255, 200, 0, 0.5)",
-            "0px 8px 25px rgba(255, 40, 0, 1), 0px -4px 15px rgba(255, 150, 0, 0.8)",
-            "0px 5px 15px rgba(255, 60, 0, 0.8), 0px -2px 10px rgba(255, 200, 0, 0.5)"
+            "0px 0px 15px rgba(167, 139, 250, 0.6), 0px 0px 30px rgba(6, 182, 212, 0.4)",
+            "0px 0px 25px rgba(167, 139, 250, 0.9), 0px 0px 45px rgba(6, 182, 212, 0.7)",
+            "0px 0px 15px rgba(167, 139, 250, 0.6), 0px 0px 30px rgba(6, 182, 212, 0.4)"
           ]
         }}
-        transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut" }}
+        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
         style={{
-          fontSize: 26, 
+          fontSize: 22, 
           fontWeight: 900, 
-          letterSpacing: 4, 
-          background: "linear-gradient(to top, #ff0000 20%, #ff8c00 60%, #ffffaa 100%)",
+          letterSpacing: 3, 
+          background: "linear-gradient(135deg, #a78bfa 0%, #06b6d4 100%)",
           WebkitBackgroundClip: "text",
           WebkitTextFillColor: "transparent",
           display: "inline-block",
-          filter: "drop-shadow(0px 4px 2px rgba(50,0,0,0.8))",
-          transformStyle: "preserve-3d"
         }}
       >
-        AEXIS
+        CLARIVOX
       </motion.span>
-      {/* Lava glow under text */}
-      <motion.div
-        animate={{ opacity: [0.4, 0.8, 0.4], scale: [0.8, 1.2, 0.8] }}
-        transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
-        style={{
-          position: "absolute", bottom: -5, left: "10%", right: "10%", height: 10,
-          background: "rgba(255, 60, 0, 0.6)", filter: "blur(10px)", zIndex: -1
-        }}
-      />
     </motion.div>
   );
 }
@@ -301,42 +301,42 @@ export default function Home() {
         <motion.nav initial={{ opacity: 0, x: "-50%", y: -20 }} animate={{ opacity: 1, x: "-50%", y: 0 }}
           transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
           style={{
-            position: "absolute", top: 24, left: "50%",
-            width: "calc(100% - 64px)", maxWidth: 1200, height: 64,
+            position: "absolute", top: 16, left: "50%",
+            width: "min(calc(100% - 24px), 1200px)", height: 56,
             display: "flex", alignItems: "center", justifyContent: "space-between",
-            padding: "0 32px", borderRadius: 100,
-            background: "rgba(20, 20, 20, 0.5)",
+            padding: "0 18px", borderRadius: 100,
+            background: "rgba(20, 20, 20, 0.65)",
             backdropFilter: "blur(20px) saturate(180%)",
-            border: "1px solid rgba(255, 255, 255, 0.05)",
+            border: "1px solid rgba(255, 255, 255, 0.08)",
             boxShadow: "0 10px 30px rgba(0,0,0,0.5), inset 0 1px 1px rgba(255,255,255,0.1)"
           }}>
           {/* Brand */}
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <VolcanoLogo />
           </div>
 
-          {/* Clock */}
-          <div style={{ fontSize: 13, fontWeight: 500, color: "rgba(255,255,255,0.5)", letterSpacing: 0.5 }}>
+          {/* Clock (hidden on narrow screens to prevent overlap) */}
+          <div className="hidden md:block" style={{ fontSize: 13, fontWeight: 500, color: "rgba(255,255,255,0.5)", letterSpacing: 0.5 }}>
             {time} <span style={{ fontSize: 10, opacity: 0.5 }}>UTC</span>
           </div>
 
           {/* Auth actions */}
-          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-            <motion.button className="spatial-btn" onClick={installApp} style={{ cursor: "pointer" }}>
-              {installPrompt ? "Install App" : "Desktop App"}
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <motion.button className="spatial-btn" onClick={installApp} style={{ cursor: "pointer", fontSize: 12, padding: "6px 14px" }}>
+              {installPrompt ? "Install App" : "Get App"}
             </motion.button>
 
             {session?.user ? (
               <motion.button className="spatial-btn" onClick={() => signOut()}
-                style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", cursor: "pointer" }}>
+                style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 14px", cursor: "pointer" }}>
                 <span style={{
-                  width: 24, height: 24, background: "#fff", color: "#000", borderRadius: "50%",
+                  width: 22, height: 22, background: "#fff", color: "#000", borderRadius: "50%",
                   display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700
                 }}>{initial}</span>
-                {firstName}
+                <span className="hidden sm:inline">{firstName}</span>
               </motion.button>
             ) : (
-              <motion.button className="spatial-btn spatial-btn-primary" onClick={() => router.push("/login")} style={{ cursor: "pointer" }}>
+              <motion.button className="spatial-btn spatial-btn-primary" onClick={() => router.push("/login")} style={{ cursor: "pointer", fontSize: 12, padding: "6px 14px" }}>
                 Sign In
               </motion.button>
             )}

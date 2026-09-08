@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, forwardRef } from "react"
+import { useEffect, useRef, forwardRef, useState } from "react"
 import { SignalQuality, qualityColor } from "@/hooks/useNetworkQuality"
 
 interface VideoPlayerProps {
@@ -21,6 +21,7 @@ const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(
     ) {
         const internalRef = useRef<HTMLVideoElement>(null)
         const videoRef = (ref as React.RefObject<HTMLVideoElement>) || internalRef
+        const [hasVideo, setHasVideo] = useState(false)
 
         useEffect(() => {
             if (videoRef.current && stream) {
@@ -28,6 +29,21 @@ const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(
                 videoRef.current.play().catch(() => {});
             }
         }, [stream, videoRef])
+
+        useEffect(() => {
+            const checkTracks = () => {
+                if (!stream) {
+                    setHasVideo(false)
+                    return
+                }
+                const vTracks = stream.getVideoTracks()
+                const isLive = vTracks.length > 0 && vTracks.some(t => t.enabled && t.readyState === "live")
+                setHasVideo(isLive)
+            }
+            checkTracks()
+            const iv = setInterval(checkTracks, 800)
+            return () => clearInterval(iv)
+        }, [stream])
 
         const badgeColor =
             deepfakeLabel === "Deepfake Detected" ? "#ef4444"
@@ -76,8 +92,40 @@ const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(
                         borderRadius: "10px",
                         filter: isHighRisk ? "contrast(1.2) saturate(1.5) sepia(0.3) hue-rotate(-20deg)" : "none",
                         transition: "filter 0.3s ease",
+                        display: hasVideo ? "block" : "none"
                     }}
                 />
+
+                {/* Intentional Camera-Off / Connecting State */}
+                {!hasVideo && (
+                    <div style={{
+                        width: "100%", height: "100%",
+                        display: "flex", flexDirection: "column",
+                        alignItems: "center", justifyContent: "center",
+                        gap: "10px",
+                        background: "radial-gradient(circle at 50% 50%, #1e1b4b 0%, #0d0e15 70%, #06070a 100%)",
+                        borderRadius: "14px",
+                    }}>
+                        <div style={{
+                            width: "64px", height: "64px", borderRadius: "50%",
+                            background: "linear-gradient(135deg, #6366f1, #a855f7)",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontSize: "26px", fontWeight: "700", color: "white",
+                            boxShadow: "0 8px 24px rgba(99,102,241,0.35), inset 0 2px 0 rgba(255,255,255,0.2)"
+                        }}>
+                            {(label.charAt(0) || "U").toUpperCase()}
+                        </div>
+                        <div style={{
+                            fontSize: "11px", color: "rgba(255,255,255,0.6)",
+                            background: "rgba(255,255,255,0.06)", padding: "3px 10px",
+                            borderRadius: "20px", border: "1px solid rgba(255,255,255,0.08)",
+                            display: "flex", alignItems: "center", gap: "6px"
+                        }}>
+                            <span>📷</span>
+                            {stream ? "Camera Off" : "Connecting video..."}
+                        </div>
+                    </div>
+                )}
 
                 {/* Glaring Warning Overlay for High Risk / Fakes */}
                 {isHighRisk && (

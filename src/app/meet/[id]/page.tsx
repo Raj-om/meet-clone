@@ -168,6 +168,8 @@ export default function MeetingPage({ params }: { params: Promise<{ id: string }
     const [isVideoOff, setIsVideoOff] = useState(false)
     const [pinnedId, setPinnedId] = useState<string | null>(null)
     const [activeSidebarTab, setActiveSidebarTab] = useState<SidebarTab>('scam')
+    const [activeMobileSheet, setActiveMobileSheet] = useState<'security' | 'effects' | 'apps' | 'view' | null>(null)
+    const [mobilePanelOpen, setMobilePanelOpen] = useState(false)
     const [fraudGraph, setFraudGraph] = useState<FraudGraph>({ nodes: [], edges: [] })
     const [layoutMode] = useState<LayoutMode>('grid')
     const [showSettings, setShowSettings] = useState(false)
@@ -703,6 +705,151 @@ export default function MeetingPage({ params }: { params: Promise<{ id: string }
         }
     }
 
+    const renderActiveSidebarContent = () => (
+        <>
+            {activeSidebarTab === 'attendance' && (
+                <AttendancePanel
+                    isHost={isHost}
+                    userId={userId}
+                    displayName={displayName}
+                    attendance={attendance}
+                    roomMode={roomMode}
+                />
+            )}
+            {activeSidebarTab === 'scam' && (
+                <ScamDetectionPanel
+                    riskScore={scam.riskScore} scores={scam.scores}
+                    isHighRisk={scam.isHighRisk} isMediumRisk={scam.isMediumRisk}
+                    isEnabled={scam.isEnabled} setIsEnabled={scam.setIsEnabled}
+                    alertHistory={scam.alertHistory} audioLabel={audioDeepfake.label}
+                    audioScore={audioDeepfake.score} deepfakeLabel={deepfake.label}
+                    deepfakeScore={deepfake.confidence}
+                    puppetLabel={mediaPipeFace.stressScore > 60 ? "Unnatural Expression" : "Natural Motion"}
+                    puppetScore={mediaPipeFace.stressScore}
+                    direLabel={dire.label}
+                    direScore={dire.score} direMode={dire.mode} direServerOnline={dire.serverOnline}
+                    detectedKeywords={voice.detectedKeywords} flaggedLinks={linkScanner.flaggedLinks}
+                    lastDetectedQR={qrScanner.lastDetectedQR}
+                    mlInsights={scam.mlInsights}
+                    lstmPhase={lstm.phase}
+                    lstmBootstrapProgress={lstm.bootstrapProgress}
+                    aiOptions={aiOptions}
+                    setAiOptions={setAiOptions}
+                />
+            )}
+            {activeSidebarTab === 'classroom' && roomMode === 'classroom' && (
+                <ErrorBoundary fallbackText="Classroom AI Offline">
+                    <ClassroomDashboard 
+                        isHost={isHost} userId={userId} displayName={displayName} 
+                        session={classroom.session} launchQuiz={classroom.launchQuiz} 
+                        endQuiz={classroom.endQuiz} addNote={classroom.addNote} 
+                        getReportData={classroom.getReportData} transcript={whisper.getFullTranscript()} 
+                    />
+                </ErrorBoundary>
+            )}
+            {activeSidebarTab === 'interview' && roomMode === 'interview' && (
+                <ErrorBoundary fallbackText="Interview Tracker Offline">
+                    <InterviewerDashboard 
+                        isHost={isHost} metrics={interview.metrics} flags={interview.flags} 
+                        notes={interview.notes} interviewDuration={interview.interviewDuration} 
+                        addFlag={interview.addFlag} addNote={interview.addNote} 
+                        removeFlag={interview.removeFlag} getReportData={interview.getReportData} 
+                        transcript={whisper.getFullTranscript()} 
+                    />
+                </ErrorBoundary>
+            )}
+            {activeSidebarTab === 'exam_panel' && roomMode === 'exam' && isHost && (
+                <ErrorBoundary fallbackText="Exam Engine Offline">
+                    <InvigilatorDashboard 
+                        studentStatuses={exam.studentStatuses} violations={exam.violations} 
+                        examState={exam.examState} examTimeRemaining={exam.examTimeRemaining} 
+                        startExam={exam.startExam} endExam={exam.endExam} getGradedResults={exam.getGradedResults}
+                    />
+                </ErrorBoundary>
+            )}
+            {activeSidebarTab === 'chat' && (
+                <ChatPanel
+                    messages={chat.messages}
+                    currentUserId={userId}
+                    onSend={chat.sendMessage}
+                    onSendImage={chat.sendImage}
+                    onOpen={chat.markRead}
+                    onClose={chat.markClosed}
+                />
+            )}
+            {activeSidebarTab === 'participants' && (
+                isHost ? (
+                    <GlobalHostDashboard
+                        participants={participants.length > 0 ? participants : [{ userId, displayName, isMuted, isVideoOff, handRaised, isHost: true }]}
+                        currentUserId={userId}
+                        roomMode={roomMode}
+                        onMuteAll={() => socket?.emit("mute-all")}
+                        onMuteUser={(uid) => socket?.emit("mute-user", { targetUserId: uid })}
+                        onKickUser={(uid) => socket?.emit("kick-user", { targetUserId: uid })}
+                        onBlockIp={(uid) => socket?.emit("ban-user", { targetUserId: uid })}
+                    />
+                ) : (
+                    <ParticipantsPanel
+                        participants={participants.length > 0 ? participants : [{ userId, displayName, isMuted, isVideoOff, handRaised, isHost: false }]}
+                        currentUserId={userId}
+                        isHost={isHost}
+                        handRaised={handRaised}
+                        onToggleHand={toggleHand}
+                        onMuteAll={() => {}}
+                        onMuteUser={(uid) => {}}
+                        onKickUser={(uid) => {}}
+                    />
+                )
+            )}
+            {activeSidebarTab === 'qna' && <QnAPanel socket={socket} userId={userId} displayName={displayName} isHost={isHost} />}
+            {activeSidebarTab === 'polls' && <PollsPanel socket={socket} userId={userId} displayName={displayName} isHost={isHost} />}
+            {activeSidebarTab === 'breakout' && <BreakoutRoomsPanel socket={socket} userId={userId} isHost={isHost} participants={participants} mainRoomId={meetingId as string} />}
+            {activeSidebarTab === 'graph' && <FraudNetworkGraph graph={fraudGraph} />}
+            {activeSidebarTab === 'notify' && <NotificationManager meetingId={meetingId as string} />}
+            {activeSidebarTab === 'tutor' && (
+                <ErrorBoundary fallbackText="AI Tutor Offline">
+                    <AITutorPanel 
+                        isHost={isHost} 
+                        socket={socket} 
+                        studentId={userId} 
+                        studentName={displayName} 
+                        serverStatus={tutor.isServerActive} 
+                        logs={tutor.logs} 
+                    />
+                </ErrorBoundary>
+            )}
+            {activeSidebarTab === 'engagement' && (
+                <ErrorBoundary fallbackText="Engagement Analytics Offline">
+                    <EngagementPanel
+                        isHost={isHost}
+                        participants={[
+                            {
+                                userId,
+                                displayName,
+                                isLocal: true,
+                                engagement: localEngagement,
+                            },
+                            ...participants
+                                .filter(p => p.userId !== userId)
+                                .map(p => ({
+                                    userId: p.userId,
+                                    displayName: p.displayName,
+                                    isLocal: false,
+                                    engagement: {
+                                        score: 0,
+                                        level: 'Absent' as const,
+                                        trend: 'stable' as const,
+                                        history: [],
+                                        breakdown: { gazeScore: 0, faceScore: 0, calmScore: 0, behaviorScore: 0 },
+                                    },
+                                }))
+                        ]}
+                    />
+                </ErrorBoundary>
+            )}
+        </>
+    )
+
     return (
         <div ref={containerRef} style={{
             backgroundColor: "#0b0f19", height: "100vh", display: "flex", flexDirection: "column",
@@ -822,21 +969,21 @@ export default function MeetingPage({ params }: { params: Promise<{ id: string }
             )}
 
             {/* ── Top Bar ── */}
-            <div style={{ padding: "10px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div style={{ color: "white", fontSize: "1.05rem", fontWeight: 700, display: "flex", alignItems: "center", gap: "10px" }}>
-                    <img src="/clarivox-logo.png" alt="CLARIVOX" style={{ width: 28, height: 28, borderRadius: 6, boxShadow: "0 0 10px rgba(124,58,237,0.6)" }} />
-                    <span style={{ background: "linear-gradient(135deg, #a78bfa, #06b6d4)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", letterSpacing: "0.06em" }}>CLARIVOX</span>
+            <div style={{ padding: "10px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
+                <div style={{ color: "white", fontSize: "1.05rem", fontWeight: 700, display: "flex", alignItems: "center", gap: "10px", flexWrap: "nowrap", overflowX: "auto" }}>
+                    <img src="/clarivox-logo.png" alt="CLARIVOX" style={{ width: 28, height: 28, borderRadius: 6, boxShadow: "0 0 10px rgba(124,58,237,0.6)", flexShrink: 0 }} />
+                    <span style={{ background: "linear-gradient(135deg, #a78bfa, #06b6d4)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", letterSpacing: "0.06em", whiteSpace: "nowrap" }}>CLARIVOX</span>
                     <span style={{ color: "#5f6368", fontSize: "12px" }}>|</span>
-                    <span style={{ color: "#9ca3af", fontSize: "13px", fontFamily: "monospace" }}>
+                    <span style={{ color: "#9ca3af", fontSize: "13px", fontFamily: "monospace", whiteSpace: "nowrap" }}>
                         {meetingId.length >= 9 ? meetingId.replace(/(\d{3})(\d{3})(\d{3})/, "$1-$2-$3") : meetingId}
                     </span>
                     {isArenaActive && (
-                        <span style={{ fontSize: "0.7rem", background: "rgba(124,58,237,0.2)", color: "#a78bfa", border: "1px solid rgba(124,58,237,0.4)", padding: "2px 8px", borderRadius: 20, letterSpacing: "0.05em" }}>
+                        <span style={{ fontSize: "0.7rem", background: "rgba(124,58,237,0.2)", color: "#a78bfa", border: "1px solid rgba(124,58,237,0.4)", padding: "2px 8px", borderRadius: 20, letterSpacing: "0.05em", whiteSpace: "nowrap" }}>
                             ⚡ ARENA {congestionProb > 0.55 ? "🔴" : congestionProb > 0.3 ? "🟡" : "🟢"}
                         </span>
                     )}
                     {isRecording && (
-                        <span style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "0.8rem", backgroundColor: "rgba(234,67,53,0.15)", color: "#ea4335", padding: "3px 8px", borderRadius: "4px" }}>
+                        <span style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "0.8rem", backgroundColor: "rgba(234,67,53,0.15)", color: "#ea4335", padding: "3px 8px", borderRadius: "4px", whiteSpace: "nowrap" }}>
                             <span style={{ width: "7px", height: "7px", backgroundColor: "#ea4335", borderRadius: "50%", display: "inline-block", animation: "pulse 1.5s infinite" }} />
                             REC
                         </span>
@@ -848,24 +995,28 @@ export default function MeetingPage({ params }: { params: Promise<{ id: string }
                             color: scam.isHighRisk ? "#ef4444" : scam.isMediumRisk ? "#f59e0b" : "#22c55e",
                             background: scam.isHighRisk ? "#ef444415" : scam.isMediumRisk ? "#f59e0b15" : "#22c55e15",
                             border: `1px solid ${scam.isHighRisk ? "#ef444440" : scam.isMediumRisk ? "#f59e0b40" : "#22c55e40"}`,
-                            padding: "2px 8px", borderRadius: "99px"
-                        }}>Risk: {scam.riskScore}</span>
+                            padding: "2px 8px", borderRadius: "99px", whiteSpace: "nowrap"
+                        }}>
+                            {scam.isHighRisk ? `🚨 Risk: ${scam.riskScore}` : scam.isMediumRisk ? `⚠️ Risk: ${scam.riskScore}` : "🛡️ Safe"}
+                        </span>
                     )}
                     {aiOptimizationEnabled && (
                         <span style={{
                             fontSize: "11px", fontWeight: "700", color: "#8ab4f8",
                             background: "#8ab4f815", border: "1px solid #8ab4f840",
-                            padding: "2px 8px", borderRadius: "99px"
-                        }}>AI QoS: {arenaState ? (arenaState.totalAllocatedBitrate / 1000).toFixed(0) : "--"}kbps</span>
+                            padding: "2px 8px", borderRadius: "99px", whiteSpace: "nowrap"
+                        }}>
+                            AI QoS: {arenaState && arenaState.totalAllocatedBitrate ? `${(arenaState.totalAllocatedBitrate / 1000).toFixed(0)}kbps` : "Optimal"}
+                        </span>
                     )}
                 </div>
-                <div style={{ display: "flex", gap: "12px", alignItems: "center", color: "white", fontSize: "13px" }}>
-                    <span style={{ color: "#9ca3af" }}>⏱ {elapsed}</span>
-                    <span style={{ color: "#9ca3af" }}>{mounted ? new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                <div style={{ display: "flex", gap: "12px", alignItems: "center", color: "white", fontSize: "13px", flexShrink: 0 }}>
+                    <span style={{ color: "#9ca3af", whiteSpace: "nowrap" }}>⏱ {elapsed}</span>
+                    <span className="header-meta-desktop" style={{ color: "#9ca3af", whiteSpace: "nowrap" }}>{mounted ? new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</span>
 
-                    <button onClick={() => setShowInfo(true)} title="Meeting info" style={{ background: "none", border: "1px solid #5f6368", borderRadius: "6px", color: "white", padding: "4px 10px", cursor: "pointer", fontSize: "12px" }}>📋 Info</button>
-                    <button onClick={togglePiP} title="Picture-in-Picture" style={{ background: "none", border: "none", color: "#9ca3af", cursor: "pointer", fontSize: "18px" }}>🪟</button>
-                    <button onClick={toggleFullscreen} title="Fullscreen" style={{ background: "none", border: "none", color: "#9ca3af", cursor: "pointer", fontSize: "18px" }}>{isFullscreen ? "⊡" : "⛶"}</button>
+                    <button className="header-meta-desktop" onClick={() => setShowInfo(true)} title="Meeting info" style={{ background: "none", border: "1px solid #5f6368", borderRadius: "6px", color: "white", padding: "4px 10px", cursor: "pointer", fontSize: "12px", whiteSpace: "nowrap" }}>📋 Info</button>
+                    <button className="header-meta-desktop" onClick={togglePiP} title="Picture-in-Picture" style={{ background: "none", border: "none", color: "#9ca3af", cursor: "pointer", fontSize: "18px" }}>🪟</button>
+                    <button className="header-meta-desktop" onClick={toggleFullscreen} title="Fullscreen" style={{ background: "none", border: "none", color: "#9ca3af", cursor: "pointer", fontSize: "18px" }}>{isFullscreen ? "⊡" : "⛶"}</button>
                     {isHost && (
                         <button onClick={() => { setRoomLocked(l => { const next = !l; socket?.emit("lock-room", next); return next }) }}
                             title={roomLocked ? "Unlock meeting" : "Lock meeting"}
@@ -881,9 +1032,9 @@ export default function MeetingPage({ params }: { params: Promise<{ id: string }
                 {/* Video grid */}
                 <div className="video-area" id="video-area-inner" style={{ flex: 1, position: "relative", overflow: "hidden" }}>
                     {/* Watermarking Overlay (Enterprise Security) */}
-                    <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 50, overflow: "hidden", opacity: 0.1, display: "flex", flexWrap: "wrap", justifyContent: "center", alignContent: "center", gap: "80px", transform: "rotate(-25deg) scale(1.5)" }}>
-                        {Array.from({ length: 30 }).map((_, i) => (
-                            <div key={i} style={{ color: "white", fontSize: "28px", fontWeight: "bold", userSelect: "none", whiteSpace: "nowrap" }}>
+                    <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 50, overflow: "hidden", opacity: 0.03, display: "flex", flexWrap: "wrap", justifyContent: "center", alignContent: "center", gap: "120px", transform: "rotate(-25deg) scale(1.3)" }}>
+                        {Array.from({ length: 16 }).map((_, i) => (
+                            <div key={i} style={{ color: "white", fontSize: "16px", fontWeight: "600", userSelect: "none", whiteSpace: "nowrap", letterSpacing: "1px" }}>
                                 {displayName} ({userId})
                             </div>
                         ))}
@@ -958,10 +1109,29 @@ export default function MeetingPage({ params }: { params: Promise<{ id: string }
                             {latestCaption.text}
                         </div>
                     )}
+
+                    {/* Floating active panel toggle on mobile */}
+                    <div className="mobile-only-fab" style={{
+                        position: "absolute", top: "12px", right: "12px", zIndex: 40
+                    }}>
+                        <button onClick={() => setMobilePanelOpen(true)} style={{
+                            background: "rgba(31, 41, 55, 0.85)", backdropFilter: "blur(8px)",
+                            border: "1px solid rgba(255,255,255,0.15)", borderRadius: "20px",
+                            padding: "6px 12px", color: "white", display: "flex", alignItems: "center",
+                            gap: "6px", fontSize: "12px", fontWeight: "600", cursor: "pointer",
+                            boxShadow: "0 4px 12px rgba(0,0,0,0.3)"
+                        }}>
+                            <span>{sidebarTabs.find(t => t.key === activeSidebarTab)?.icon || "🛡️"}</span>
+                            <span>{sidebarTabs.find(t => t.key === activeSidebarTab)?.label || "AI Panel"}</span>
+                            {chat.unreadCount > 0 && (
+                                <span style={{ background: "#ef4444", borderRadius: "50%", padding: "1px 5px", fontSize: "10px" }}>{chat.unreadCount}</span>
+                            )}
+                        </button>
+                    </div>
                 </div>
 
                 {/* ── Sidebar ── */}
-                <div className="sidebar" style={{ width: "320px", display: "flex", flexDirection: "column", gap: "10px", flexShrink: 0 }}>
+                <div className="sidebar desktop-sidebar" style={{ width: "320px", display: "flex", flexDirection: "column", gap: "10px", flexShrink: 0 }}>
                     {/* Sidebar tabs */}
                     <div style={{ display: "flex", gap: "3px", flexWrap: "wrap" }}>
                         {sidebarTabs.map(tab => (
@@ -995,150 +1165,56 @@ export default function MeetingPage({ params }: { params: Promise<{ id: string }
                     </div>
 
                     <div style={{ flex: 1, overflowY: "auto", height: "calc(100% - 46px)" }}>
-                        {activeSidebarTab === 'attendance' && (
-                            <AttendancePanel
-                                isHost={isHost}
-                                userId={userId}
-                                displayName={displayName}
-                                attendance={attendance}
-                                roomMode={roomMode}
-                            />
-                        )}
-                        {activeSidebarTab === 'scam' && (
-                            <ScamDetectionPanel
-                                riskScore={scam.riskScore} scores={scam.scores}
-                                isHighRisk={scam.isHighRisk} isMediumRisk={scam.isMediumRisk}
-                                isEnabled={scam.isEnabled} setIsEnabled={scam.setIsEnabled}
-                                alertHistory={scam.alertHistory} audioLabel={audioDeepfake.label}
-                                audioScore={audioDeepfake.score} deepfakeLabel={deepfake.label}
-                                deepfakeScore={deepfake.confidence}
-                                puppetLabel={mediaPipeFace.stressScore > 60 ? "Unnatural Expression" : "Natural Motion"}
-                                puppetScore={mediaPipeFace.stressScore}
-                                direLabel={dire.label}
-                                direScore={dire.score} direMode={dire.mode} direServerOnline={dire.serverOnline}
-                                detectedKeywords={voice.detectedKeywords} flaggedLinks={linkScanner.flaggedLinks}
-                                lastDetectedQR={qrScanner.lastDetectedQR}
-                                mlInsights={scam.mlInsights}
-                                lstmPhase={lstm.phase}
-                                lstmBootstrapProgress={lstm.bootstrapProgress}
-                                aiOptions={aiOptions}
-                                setAiOptions={setAiOptions}
-                            />
-                        )}
-                        {activeSidebarTab === 'classroom' && roomMode === 'classroom' && (
-                            <ErrorBoundary fallbackText="Classroom AI Offline">
-                                <ClassroomDashboard 
-                                    isHost={isHost} userId={userId} displayName={displayName} 
-                                    session={classroom.session} launchQuiz={classroom.launchQuiz} 
-                                    endQuiz={classroom.endQuiz} addNote={classroom.addNote} 
-                                    getReportData={classroom.getReportData} transcript={whisper.getFullTranscript()} 
-                                />
-                            </ErrorBoundary>
-                        )}
-                        {activeSidebarTab === 'interview' && roomMode === 'interview' && (
-                            <ErrorBoundary fallbackText="Interview Tracker Offline">
-                                <InterviewerDashboard 
-                                    isHost={isHost} metrics={interview.metrics} flags={interview.flags} 
-                                    notes={interview.notes} interviewDuration={interview.interviewDuration} 
-                                    addFlag={interview.addFlag} addNote={interview.addNote} 
-                                    removeFlag={interview.removeFlag} getReportData={interview.getReportData} 
-                                    transcript={whisper.getFullTranscript()} 
-                                />
-                            </ErrorBoundary>
-                        )}
-                        {activeSidebarTab === 'exam_panel' && roomMode === 'exam' && isHost && (
-                            <ErrorBoundary fallbackText="Exam Engine Offline">
-                                <InvigilatorDashboard 
-                                    studentStatuses={exam.studentStatuses} violations={exam.violations} 
-                                    examState={exam.examState} examTimeRemaining={exam.examTimeRemaining} 
-                                    startExam={exam.startExam} endExam={exam.endExam} getGradedResults={exam.getGradedResults}
-                                />
-                            </ErrorBoundary>
-                        )}
-                        {activeSidebarTab === 'chat' && (
-                            <ChatPanel
-                                messages={chat.messages}
-                                currentUserId={userId}
-                                onSend={chat.sendMessage}
-                                onSendImage={chat.sendImage}
-                                onOpen={chat.markRead}
-                                onClose={chat.markClosed}
-                            />
-                        )}
-                        {activeSidebarTab === 'participants' && (
-                            isHost ? (
-                                <GlobalHostDashboard
-                                    participants={participants.length > 0 ? participants : [{ userId, displayName, isMuted, isVideoOff, handRaised, isHost: true }]}
-                                    currentUserId={userId}
-                                    roomMode={roomMode}
-                                    onMuteAll={() => socket?.emit("mute-all")}
-                                    onMuteUser={(uid) => socket?.emit("mute-user", { targetUserId: uid })}
-                                    onKickUser={(uid) => socket?.emit("kick-user", { targetUserId: uid })}
-                                    onBlockIp={(uid) => socket?.emit("ban-user", { targetUserId: uid })}
-                                />
-                            ) : (
-                                <ParticipantsPanel
-                                    participants={participants.length > 0 ? participants : [{ userId, displayName, isMuted, isVideoOff, handRaised, isHost: false }]}
-                                    currentUserId={userId}
-                                    isHost={isHost}
-                                    handRaised={handRaised}
-                                    onToggleHand={toggleHand}
-                                    onMuteAll={() => {}}
-                                    onMuteUser={(uid) => {}}
-                                    onKickUser={(uid) => {}}
-                                />
-                            )
-                        )}
-                        {activeSidebarTab === 'qna' && <QnAPanel socket={socket} userId={userId} displayName={displayName} isHost={isHost} />}
-                        {activeSidebarTab === 'polls' && <PollsPanel socket={socket} userId={userId} displayName={displayName} isHost={isHost} />}
-                        {activeSidebarTab === 'breakout' && <BreakoutRoomsPanel socket={socket} userId={userId} isHost={isHost} participants={participants} mainRoomId={meetingId as string} />}
-                        {activeSidebarTab === 'graph' && <FraudNetworkGraph graph={fraudGraph} />}
-                        {activeSidebarTab === 'notify' && <NotificationManager meetingId={meetingId as string} />}
-                        {activeSidebarTab === 'tutor' && (
-                            <ErrorBoundary fallbackText="AI Tutor Offline">
-                                <AITutorPanel 
-                                    isHost={isHost} 
-                                    socket={socket} 
-                                    studentId={userId} 
-                                    studentName={displayName} 
-                                    serverStatus={tutor.isServerActive} 
-                                    logs={tutor.logs} 
-                                />
-                            </ErrorBoundary>
-                        )}
-                        {/* ── Feature 4: Engagement Panel ── */}
-                        {activeSidebarTab === 'engagement' && (
-                            <ErrorBoundary fallbackText="Engagement Analytics Offline">
-                                <EngagementPanel
-                                    isHost={isHost}
-                                    participants={[
-                                        {
-                                            userId,
-                                            displayName,
-                                            isLocal: true,
-                                            engagement: localEngagement,
-                                        },
-                                        ...participants
-                                            .filter(p => p.userId !== userId)
-                                            .map(p => ({
-                                                userId: p.userId,
-                                                displayName: p.displayName,
-                                                isLocal: false,
-                                                engagement: {
-                                                    score: 0,
-                                                    level: 'Absent' as const,
-                                                    trend: 'stable' as const,
-                                                    history: [],
-                                                    breakdown: { gazeScore: 0, faceScore: 0, calmScore: 0, behaviorScore: 0 },
-                                                },
-                                            }))
-                                    ]}
-                                />
-                            </ErrorBoundary>
-                        )}
+                        {renderActiveSidebarContent()}
                     </div>
                 </div>
             </div>
+
+            {/* ── Mobile Full-Screen Panel Drawer ── */}
+            {mobilePanelOpen && (
+                <div style={{
+                    position: "fixed", inset: 0, zIndex: 9200,
+                    backgroundColor: "#0f172a", display: "flex", flexDirection: "column"
+                }}>
+                    {/* Panel Header */}
+                    <div style={{
+                        display: "flex", alignItems: "center", justifyContent: "space-between",
+                        padding: "12px 16px", borderBottom: "1px solid rgba(255,255,255,0.1)",
+                        background: "#1e293b", flexShrink: 0
+                    }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "white", fontWeight: "700", fontSize: "15px" }}>
+                            <span>{sidebarTabs.find(t => t.key === activeSidebarTab)?.icon || "📱"}</span>
+                            <span>{sidebarTabs.find(t => t.key === activeSidebarTab)?.label || "Panel"}</span>
+                        </div>
+                        {/* Horizontal Tab Chips */}
+                        <div style={{ display: "flex", gap: "6px", overflowX: "auto", maxWidth: "55%", padding: "2px 0" }}>
+                            {sidebarTabs.map(tab => (
+                                <button key={tab.key} onClick={() => {
+                                    setActiveSidebarTab(tab.key);
+                                    if (tab.key === "chat") chat.markRead();
+                                }} style={{
+                                    padding: "4px 10px", borderRadius: "14px",
+                                    background: activeSidebarTab === tab.key ? "#3b82f6" : "rgba(255,255,255,0.08)",
+                                    color: "white", border: "none", fontSize: "11px", whiteSpace: "nowrap", cursor: "pointer"
+                                }}>
+                                    {tab.icon} {tab.label}
+                                </button>
+                            ))}
+                        </div>
+                        <button onClick={() => setMobilePanelOpen(false)} style={{
+                            background: "rgba(255,255,255,0.1)", border: "none", color: "white",
+                            width: "32px", height: "32px", borderRadius: "50%", cursor: "pointer",
+                            display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", fontWeight: "bold"
+                        }}>
+                            ✕
+                        </button>
+                    </div>
+                    {/* Panel Content (Full Height, Scrollable) */}
+                    <div style={{ flex: 1, overflowY: "auto", padding: "14px 12px" }}>
+                        {renderActiveSidebarContent()}
+                    </div>
+                </div>
+            )}
 
             {/* ── Control Bar ── */}
             <div className="control-bar" style={{ height: "80px", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 20px", flexShrink: 0 }}>
@@ -1176,7 +1252,7 @@ export default function MeetingPage({ params }: { params: Promise<{ id: string }
                     <div style={{ width: "1px", height: "32px", background: "rgba(255,255,255,0.1)", margin: "0 6px" }} />
 
                     {/* Group 1: Security & AI */}
-                    <DropUpMenu title="Security" icon="🛡️" badge={scam.isHighRisk ? "!" : undefined}>
+                    <DropUpMenu title="Security" icon="🛡️" badge={scam.isHighRisk ? "!" : undefined} onMobileClick={() => setActiveMobileSheet("security")}>
                         {isHost && <MenuItem onClick={() => setRoomLocked(l => { const next = !l; socket?.emit("lock-room", next); return next })} icon={roomLocked ? "🔒" : "🔓"} label={roomLocked ? "Unlock Meeting" : "Lock Meeting"} active={roomLocked} />}
                         {isHost && <MenuItem onClick={() => setAiOptimizationEnabled(v => !v)} icon="🚀" label="AI Call Optimizer" active={aiOptimizationEnabled} />}
                         <MenuItem onClick={() => setActiveSidebarTab("scam")} icon="🛑" label="Scam AI Dashboard" active={activeSidebarTab === "scam"} danger={scam.isHighRisk} />
@@ -1184,13 +1260,13 @@ export default function MeetingPage({ params }: { params: Promise<{ id: string }
                     </DropUpMenu>
 
                     {/* Group 2: Audio/Video Effects */}
-                    <DropUpMenu title="Effects" icon="✨">
+                    <DropUpMenu title="Effects" icon="✨" onMobileClick={() => setActiveMobileSheet("effects")}>
                         <MenuItem onClick={() => setBgMode(m => m === "none" ? "blur" : m === "blur" ? "image" : "none")} icon="🖼️" label="Virtual Background" active={bgMode !== "none"} />
                         <MenuItem onClick={() => setNoiseReduction(v => !v)} icon="🤫" label="Noise Cancellation" active={noiseReduction} />
                     </DropUpMenu>
 
                     {/* Group 3: Apps & Tools */}
-                    <DropUpMenu title="Apps" icon="🛠️">
+                    <DropUpMenu title="Apps" icon="🛠️" onMobileClick={() => setActiveMobileSheet("apps")}>
                         <MenuItem onClick={() => setActiveSidebarTab("qna")} icon="❓" label="Q&A" active={activeSidebarTab === "qna"} />
                         <MenuItem onClick={() => setActiveSidebarTab("polls")} icon="📊" label="Polls" active={activeSidebarTab === "polls"} />
                         {isHost && <MenuItem onClick={() => setActiveSidebarTab("breakout")} icon="🚪" label="Breakout Rooms" active={activeSidebarTab === "breakout"} />}
@@ -1199,7 +1275,7 @@ export default function MeetingPage({ params }: { params: Promise<{ id: string }
                     </DropUpMenu>
 
                     {/* Group 4: View & Preferences */}
-                    <DropUpMenu title="View" icon="👁️">
+                    <DropUpMenu title="View" icon="👁️" onMobileClick={() => setActiveMobileSheet("view")}>
                         <MenuItem onClick={() => setCaptionsEnabled(v => !v)} icon="💬" label="Live Captions" active={captionsEnabled} />
                         <MenuItem onClick={() => setPinnedId(null)} icon="🔠" label="Grid View" active={pinnedId === null} />
                         <MenuItem onClick={togglePiP} icon="🪟" label="Picture-in-Picture" />
@@ -1228,29 +1304,552 @@ export default function MeetingPage({ params }: { params: Promise<{ id: string }
                     @keyframes slideUp { from { opacity:0; transform: translateX(-50%) translateY(10px); } to { opacity:1; transform: translateX(-50%) translateY(0); } }
                     
                     /* Mobile Responsive Layout overrides */
+                    .mobile-only-fab {
+                        display: none;
+                    }
                     @media (max-width: 768px) {
+                        .mobile-only-fab {
+                            display: block !important;
+                        }
                         .main-area {
                             flex-direction: column !important;
-                            padding: 8px !important;
-                            gap: 8px !important;
+                            padding: 4px !important;
+                            gap: 0 !important;
                         }
-                        .sidebar {
+                        .video-area {
                             width: 100% !important;
-                            height: 35vh !important;
-                            flex-shrink: 0 !important;
+                            height: 100% !important;
+                        }
+                        .desktop-sidebar {
+                            display: none !important;
                         }
                         .control-bar {
                             width: 100% !important;
                             overflow-x: auto !important;
-                            justify-content: flex-start !important;
-                            padding: 0 10px !important;
+                            overflow-y: hidden !important;
+                            justify-content: space-around !important;
+                            padding: 8px 8px !important;
+                            height: auto !important;
+                            min-height: 70px !important;
+                            background: #111827 !important;
+                            border-top: 1px solid rgba(255,255,255,0.08) !important;
+                            padding-bottom: max(16px, env(safe-area-inset-bottom)) !important;
+                            -webkit-overflow-scrolling: touch;
                         }
                         .control-left {
                             display: none !important;
                         }
+                        .header-meta-desktop {
+                            display: none !important;
+                        }
+                    }
+                    @keyframes slideUpSheet {
+                        from { transform: translateY(100%); }
+                        to { transform: translateY(0); }
                     }
                 `}</style>
             </div>
+
+            {/* ── Mobile Bottom Sheet for Sub-options ── */}
+            {activeMobileSheet && (
+                <div style={{
+                    position: "fixed", inset: 0, zIndex: 9500,
+                    backgroundColor: "rgba(0, 0, 0, 0.7)", backdropFilter: "blur(8px)",
+                    display: "flex", flexDirection: "column", justifyContent: "flex-end"
+                }} onClick={() => setActiveMobileSheet(null)}>
+                    <div style={{
+                        background: "#1e2430", borderTopLeftRadius: "24px", borderTopRightRadius: "24px",
+                        borderTop: "1px solid rgba(255,255,255,0.15)", maxHeight: "82vh",
+                        display: "flex", flexDirection: "column", overflow: "hidden",
+                        boxShadow: "0 -12px 48px rgba(0,0,0,0.85)",
+                        paddingBottom: "max(24px, env(safe-area-inset-bottom))",
+                        animation: "slideUpSheet 0.22s cubic-bezier(0.16, 1, 0.3, 1)"
+                    }} onClick={e => e.stopPropagation()}>
+                        {/* Drag Handle Bar */}
+                        <div style={{ width: "40px", height: "4px", borderRadius: "2px", background: "rgba(255,255,255,0.25)", margin: "10px auto 4px" }} />
+                        
+                        {/* Sheet Header */}
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 20px 14px", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+                            <div>
+                                <div style={{ color: "white", fontWeight: "700", fontSize: "17px" }}>
+                                    {activeMobileSheet === 'security' && "🛡️ Security & AI Defense"}
+                                    {activeMobileSheet === 'effects' && "✨ Video & Audio Effects"}
+                                    {activeMobileSheet === 'apps' && "🛠️ Apps & Collaboration"}
+                                    {activeMobileSheet === 'view' && "👁️ View & Preferences"}
+                                </div>
+                                <div style={{ color: "#9ca3af", fontSize: "12px", marginTop: "2px" }}>
+                                    {activeMobileSheet === 'security' && "Deepfake prevention, scam shield & active guards"}
+                                    {activeMobileSheet === 'effects' && "Virtual backgrounds and noise suppression"}
+                                    {activeMobileSheet === 'apps' && "Meeting utilities, chat, attendance and AI tools"}
+                                    {activeMobileSheet === 'view' && "Layout, captions and display preferences"}
+                                </div>
+                            </div>
+                            <button onClick={() => setActiveMobileSheet(null)} style={{
+                                background: "rgba(255,255,255,0.1)", border: "none", color: "#e5e7eb",
+                                width: "32px", height: "32px", borderRadius: "50%", cursor: "pointer",
+                                display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px"
+                            }}>
+                                ✕
+                            </button>
+                        </div>
+
+                        {/* Content */}
+                        <div style={{ overflowY: "auto", padding: "16px", display: "flex", flexDirection: "column", gap: "10px" }}>
+                            {activeMobileSheet === 'security' && (
+                                <>
+                                    {/* Security Status Card */}
+                                    <div style={{
+                                        padding: "12px 16px", borderRadius: "12px",
+                                        background: scam.isHighRisk ? "rgba(239,68,68,0.15)" : "rgba(34,197,94,0.12)",
+                                        border: `1px solid ${scam.isHighRisk ? "#ef444450" : "#22c55e50"}`,
+                                        display: "flex", alignItems: "center", justifyContent: "space-between"
+                                    }}>
+                                        <div>
+                                            <div style={{ fontSize: "13px", fontWeight: "700", color: scam.isHighRisk ? "#ef4444" : "#22c55e" }}>
+                                                {scam.isHighRisk ? "🚨 HIGH RISK THREAT" : "🛡️ ACTIVE DEFENSE OPERATIONAL"}
+                                            </div>
+                                            <div style={{ fontSize: "11px", color: "#9ca3af", marginTop: "2px" }}>
+                                                {scam.isHighRisk ? "Suspicious anomalies detected in session" : "All participants verified with neural biometrics"}
+                                            </div>
+                                        </div>
+                                        <div style={{
+                                            fontSize: "13px", fontWeight: "bold", padding: "4px 10px", borderRadius: "8px",
+                                            background: scam.isHighRisk ? "#ef4444" : "#22c55e", color: "white"
+                                        }}>
+                                            Risk: {scam.riskScore}/100
+                                        </div>
+                                    </div>
+
+                                    {/* Sub-option: Scam AI Dashboard */}
+                                    <button onClick={() => { setActiveSidebarTab("scam"); setMobilePanelOpen(true); setActiveMobileSheet(null); }} style={{
+                                        display: "flex", alignItems: "center", gap: "12px", padding: "12px 14px",
+                                        background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
+                                        borderRadius: "12px", color: "white", cursor: "pointer", textAlign: "left"
+                                    }}>
+                                        <span style={{ fontSize: "22px" }}>🛑</span>
+                                        <div style={{ flex: 1 }}>
+                                            <div style={{ fontSize: "14px", fontWeight: "600" }}>Scam AI Dashboard</div>
+                                            <div style={{ fontSize: "11px", color: "#9ca3af" }}>Deepfake confidence, audio stress & LSTM risk gauges</div>
+                                        </div>
+                                        <span style={{ color: "#8ab4f8", fontSize: "13px" }}>Open →</span>
+                                    </button>
+
+                                    {/* Sub-option: Risk Analysis */}
+                                    <button onClick={() => { setActiveSidebarTab("scam"); setMobilePanelOpen(true); setActiveMobileSheet(null); }} style={{
+                                        display: "flex", alignItems: "center", gap: "12px", padding: "12px 14px",
+                                        background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
+                                        borderRadius: "12px", color: "white", cursor: "pointer", textAlign: "left"
+                                    }}>
+                                        <span style={{ fontSize: "22px" }}>📊</span>
+                                        <div style={{ flex: 1 }}>
+                                            <div style={{ fontSize: "14px", fontWeight: "600" }}>Risk Analysis & Breakdown</div>
+                                            <div style={{ fontSize: "11px", color: "#9ca3af" }}>Multi-modal weighted fraud indicators</div>
+                                        </div>
+                                        <span style={{ color: "#8ab4f8", fontSize: "13px" }}>Analyze →</span>
+                                    </button>
+
+                                    {/* Sub-option: Network Threats Graph */}
+                                    <button onClick={() => { setActiveSidebarTab("graph"); setMobilePanelOpen(true); setActiveMobileSheet(null); }} style={{
+                                        display: "flex", alignItems: "center", gap: "12px", padding: "12px 14px",
+                                        background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
+                                        borderRadius: "12px", color: "white", cursor: "pointer", textAlign: "left"
+                                    }}>
+                                        <span style={{ fontSize: "22px" }}>🕸️</span>
+                                        <div style={{ flex: 1 }}>
+                                            <div style={{ fontSize: "14px", fontWeight: "600" }}>Network Threats Graph</div>
+                                            <div style={{ fontSize: "11px", color: "#9ca3af" }}>Real-time peer topology & sybil attack monitoring</div>
+                                        </div>
+                                        <span style={{ color: "#8ab4f8", fontSize: "13px" }}>View →</span>
+                                    </button>
+
+                                    {/* Sub-option: Link Scanner */}
+                                    <button onClick={() => {
+                                        const url = prompt("Enter URL to scan for phishing/scam:");
+                                        if (url && url.trim()) {
+                                            linkScanner.scanMessage(url);
+                                            setActiveSidebarTab("scam");
+                                            setMobilePanelOpen(true);
+                                        }
+                                        setActiveMobileSheet(null);
+                                    }} style={{
+                                        display: "flex", alignItems: "center", gap: "12px", padding: "12px 14px",
+                                        background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
+                                        borderRadius: "12px", color: "white", cursor: "pointer", textAlign: "left"
+                                    }}>
+                                        <span style={{ fontSize: "22px" }}>🔗</span>
+                                        <div style={{ flex: 1 }}>
+                                            <div style={{ fontSize: "14px", fontWeight: "600" }}>Link Scanner</div>
+                                            <div style={{ fontSize: "11px", color: "#9ca3af" }}>Verify URLs against zero-day phishing databases</div>
+                                        </div>
+                                        <span style={{ color: "#8ab4f8", fontSize: "13px" }}>Scan →</span>
+                                    </button>
+
+                                    {/* Sub-option: Participant Verification */}
+                                    <button onClick={() => { setActiveSidebarTab("participants"); setMobilePanelOpen(true); setActiveMobileSheet(null); }} style={{
+                                        display: "flex", alignItems: "center", gap: "12px", padding: "12px 14px",
+                                        background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
+                                        borderRadius: "12px", color: "white", cursor: "pointer", textAlign: "left"
+                                    }}>
+                                        <span style={{ fontSize: "22px" }}>👤</span>
+                                        <div style={{ flex: 1 }}>
+                                            <div style={{ fontSize: "14px", fontWeight: "600" }}>Participant Verification</div>
+                                            <div style={{ fontSize: "11px", color: "#9ca3af" }}>Verify {participants.length || 1} participant identity signatures</div>
+                                        </div>
+                                        <span style={{ color: "#8ab4f8", fontSize: "13px" }}>Check →</span>
+                                    </button>
+
+                                    {/* Sub-option: Security Alerts */}
+                                    <button onClick={() => { setActiveSidebarTab("scam"); setMobilePanelOpen(true); setActiveMobileSheet(null); }} style={{
+                                        display: "flex", alignItems: "center", gap: "12px", padding: "12px 14px",
+                                        background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
+                                        borderRadius: "12px", color: "white", cursor: "pointer", textAlign: "left"
+                                    }}>
+                                        <span style={{ fontSize: "22px" }}>🚨</span>
+                                        <div style={{ flex: 1 }}>
+                                            <div style={{ fontSize: "14px", fontWeight: "600" }}>Security Alerts Log</div>
+                                            <div style={{ fontSize: "11px", color: "#9ca3af" }}>{scam.alertHistory.length} events logged in session</div>
+                                        </div>
+                                        <span style={{ color: "#8ab4f8", fontSize: "13px" }}>Log →</span>
+                                    </button>
+
+                                    {/* Host Controls */}
+                                    {isHost && (
+                                        <div style={{ borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: "10px", marginTop: "6px", display: "flex", flexDirection: "column", gap: "8px" }}>
+                                            <div style={{ fontSize: "11px", fontWeight: "700", color: "#9ca3af", letterSpacing: "0.05em", textTransform: "uppercase" }}>Host Controls</div>
+                                            <button onClick={() => setRoomLocked(l => { const next = !l; socket?.emit("lock-room", next); return next })} style={{
+                                                display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px",
+                                                background: roomLocked ? "rgba(245,158,11,0.2)" : "rgba(255,255,255,0.06)",
+                                                border: `1px solid ${roomLocked ? "#f59e0b" : "rgba(255,255,255,0.1)"}`,
+                                                borderRadius: "12px", color: "white", cursor: "pointer"
+                                            }}>
+                                                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                                                    <span style={{ fontSize: "18px" }}>{roomLocked ? "🔒" : "🔓"}</span>
+                                                    <span style={{ fontSize: "13px", fontWeight: "600" }}>{roomLocked ? "Room is Locked" : "Room is Unlocked"}</span>
+                                                </div>
+                                                <span style={{ fontSize: "12px", color: roomLocked ? "#f59e0b" : "#9ca3af" }}>Tap to Toggle</span>
+                                            </button>
+                                            <button onClick={() => setAiOptimizationEnabled(v => !v)} style={{
+                                                display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px",
+                                                background: aiOptimizationEnabled ? "rgba(124,58,237,0.2)" : "rgba(255,255,255,0.06)",
+                                                border: `1px solid ${aiOptimizationEnabled ? "#a78bfa" : "rgba(255,255,255,0.1)"}`,
+                                                borderRadius: "12px", color: "white", cursor: "pointer"
+                                            }}>
+                                                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                                                    <span style={{ fontSize: "18px" }}>🚀</span>
+                                                    <span style={{ fontSize: "13px", fontWeight: "600" }}>AI Call Optimizer (ARENA)</span>
+                                                </div>
+                                                <span style={{ fontSize: "12px", color: aiOptimizationEnabled ? "#a78bfa" : "#9ca3af" }}>{aiOptimizationEnabled ? "Active" : "Disabled"}</span>
+                                            </button>
+                                        </div>
+                                    )}
+                                </>
+                            )}
+
+                            {activeMobileSheet === 'effects' && (
+                                <>
+                                    <div style={{ fontSize: "12px", fontWeight: "700", color: "#9ca3af", letterSpacing: "0.05em", textTransform: "uppercase" }}>Camera Background</div>
+                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
+                                        <button onClick={() => setBgMode("none")} style={{
+                                            padding: "14px 8px", borderRadius: "12px", cursor: "pointer",
+                                            background: bgMode === "none" ? "#3b82f6" : "rgba(255,255,255,0.06)",
+                                            border: `1px solid ${bgMode === "none" ? "#60a5fa" : "rgba(255,255,255,0.1)"}`,
+                                            color: "white", display: "flex", flexDirection: "column", alignItems: "center", gap: "6px"
+                                        }}>
+                                            <span style={{ fontSize: "20px" }}>🚫</span>
+                                            <span style={{ fontSize: "12px", fontWeight: "600" }}>None</span>
+                                        </button>
+                                        <button onClick={() => setBgMode("blur")} style={{
+                                            padding: "14px 8px", borderRadius: "12px", cursor: "pointer",
+                                            background: bgMode === "blur" ? "#3b82f6" : "rgba(255,255,255,0.06)",
+                                            border: `1px solid ${bgMode === "blur" ? "#60a5fa" : "rgba(255,255,255,0.1)"}`,
+                                            color: "white", display: "flex", flexDirection: "column", alignItems: "center", gap: "6px"
+                                        }}>
+                                            <span style={{ fontSize: "20px" }}>🌫️</span>
+                                            <span style={{ fontSize: "12px", fontWeight: "600" }}>Blur</span>
+                                        </button>
+                                        <button onClick={() => setBgMode("image")} style={{
+                                            padding: "14px 8px", borderRadius: "12px", cursor: "pointer",
+                                            background: bgMode === "image" ? "#3b82f6" : "rgba(255,255,255,0.06)",
+                                            border: `1px solid ${bgMode === "image" ? "#60a5fa" : "rgba(255,255,255,0.1)"}`,
+                                            color: "white", display: "flex", flexDirection: "column", alignItems: "center", gap: "6px"
+                                        }}>
+                                            <span style={{ fontSize: "20px" }}>🌌</span>
+                                            <span style={{ fontSize: "12px", fontWeight: "600" }}>Space</span>
+                                        </button>
+                                    </div>
+
+                                    <div style={{ fontSize: "12px", fontWeight: "700", color: "#9ca3af", letterSpacing: "0.05em", textTransform: "uppercase", marginTop: "10px" }}>Audio Processing</div>
+                                    <button onClick={() => setNoiseReduction(v => !v)} style={{
+                                        display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px",
+                                        background: noiseReduction ? "rgba(34,197,94,0.15)" : "rgba(255,255,255,0.06)",
+                                        border: `1px solid ${noiseReduction ? "#22c55e" : "rgba(255,255,255,0.1)"}`,
+                                        borderRadius: "12px", color: "white", cursor: "pointer"
+                                    }}>
+                                        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                                            <span style={{ fontSize: "20px" }}>🤫</span>
+                                            <div>
+                                                <div style={{ fontSize: "13px", fontWeight: "600" }}>Noise Cancellation (Silero VAD)</div>
+                                                <div style={{ fontSize: "11px", color: "#9ca3af" }}>Suppresses keyboard, traffic & background noise</div>
+                                            </div>
+                                        </div>
+                                        <div style={{
+                                            width: "44px", height: "24px", borderRadius: "12px",
+                                            background: noiseReduction ? "#22c55e" : "#4b5563",
+                                            position: "relative", transition: "background 0.2s"
+                                        }}>
+                                            <div style={{
+                                                width: "20px", height: "20px", borderRadius: "50%", background: "white",
+                                                position: "absolute", top: "2px",
+                                                left: noiseReduction ? "22px" : "2px", transition: "left 0.2s"
+                                            }} />
+                                        </div>
+                                    </button>
+
+                                    <button onClick={() => { setBgMode("none"); setNoiseReduction(false); }} style={{
+                                        display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
+                                        padding: "12px", borderRadius: "12px", background: "rgba(239,68,68,0.1)",
+                                        border: "1px solid rgba(239,68,68,0.3)", color: "#ef4444", cursor: "pointer",
+                                        fontSize: "13px", fontWeight: "600", marginTop: "6px"
+                                    }}>
+                                        <span>🔄</span> Reset All Effects
+                                    </button>
+                                </>
+                            )}
+
+                            {activeMobileSheet === 'apps' && (
+                                <>
+                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                                        <button onClick={() => { setActiveSidebarTab("chat"); chat.markRead(); setMobilePanelOpen(true); setActiveMobileSheet(null); }} style={{
+                                            display: "flex", alignItems: "center", gap: "10px", padding: "14px 12px",
+                                            background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
+                                            borderRadius: "12px", color: "white", cursor: "pointer", textAlign: "left"
+                                        }}>
+                                            <span style={{ fontSize: "22px" }}>💬</span>
+                                            <div style={{ flex: 1 }}>
+                                                <div style={{ fontSize: "13px", fontWeight: "600" }}>Meeting Chat</div>
+                                                <div style={{ fontSize: "11px", color: "#9ca3af" }}>{chat.messages.length} messages</div>
+                                            </div>
+                                            {chat.unreadCount > 0 && <span style={{ background: "#ea4335", color: "white", borderRadius: "50%", padding: "1px 6px", fontSize: "10px", fontWeight: "bold" }}>{chat.unreadCount}</span>}
+                                        </button>
+
+                                        <button onClick={() => { setActiveSidebarTab("participants"); setMobilePanelOpen(true); setActiveMobileSheet(null); }} style={{
+                                            display: "flex", alignItems: "center", gap: "10px", padding: "14px 12px",
+                                            background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
+                                            borderRadius: "12px", color: "white", cursor: "pointer", textAlign: "left"
+                                        }}>
+                                            <span style={{ fontSize: "22px" }}>👥</span>
+                                            <div style={{ flex: 1 }}>
+                                                <div style={{ fontSize: "13px", fontWeight: "600" }}>People</div>
+                                                <div style={{ fontSize: "11px", color: "#9ca3af" }}>{participants.length || 1} online</div>
+                                            </div>
+                                        </button>
+
+                                        <button onClick={() => { setActiveSidebarTab("qna"); setMobilePanelOpen(true); setActiveMobileSheet(null); }} style={{
+                                            display: "flex", alignItems: "center", gap: "10px", padding: "14px 12px",
+                                            background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
+                                            borderRadius: "12px", color: "white", cursor: "pointer", textAlign: "left"
+                                        }}>
+                                            <span style={{ fontSize: "22px" }}>❓</span>
+                                            <div>
+                                                <div style={{ fontSize: "13px", fontWeight: "600" }}>Q&A Session</div>
+                                                <div style={{ fontSize: "11px", color: "#9ca3af" }}>Ask questions</div>
+                                            </div>
+                                        </button>
+
+                                        <button onClick={() => { setActiveSidebarTab("polls"); setMobilePanelOpen(true); setActiveMobileSheet(null); }} style={{
+                                            display: "flex", alignItems: "center", gap: "10px", padding: "14px 12px",
+                                            background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
+                                            borderRadius: "12px", color: "white", cursor: "pointer", textAlign: "left"
+                                        }}>
+                                            <span style={{ fontSize: "22px" }}>📊</span>
+                                            <div>
+                                                <div style={{ fontSize: "13px", fontWeight: "600" }}>Live Polls</div>
+                                                <div style={{ fontSize: "11px", color: "#9ca3af" }}>Interactive vote</div>
+                                            </div>
+                                        </button>
+
+                                        <button onClick={() => { setActiveSidebarTab("tutor"); setMobilePanelOpen(true); setActiveMobileSheet(null); }} style={{
+                                            display: "flex", alignItems: "center", gap: "10px", padding: "14px 12px",
+                                            background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
+                                            borderRadius: "12px", color: "white", cursor: "pointer", textAlign: "left"
+                                        }}>
+                                            <span style={{ fontSize: "22px" }}>🤖</span>
+                                            <div>
+                                                <div style={{ fontSize: "13px", fontWeight: "600" }}>AI Tutor</div>
+                                                <div style={{ fontSize: "11px", color: "#9ca3af" }}>Smart tutor</div>
+                                            </div>
+                                        </button>
+
+                                        <button onClick={() => { setActiveSidebarTab("attendance"); setMobilePanelOpen(true); setActiveMobileSheet(null); }} style={{
+                                            display: "flex", alignItems: "center", gap: "10px", padding: "14px 12px",
+                                            background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
+                                            borderRadius: "12px", color: "white", cursor: "pointer", textAlign: "left"
+                                        }}>
+                                            <span style={{ fontSize: "22px" }}>🎓</span>
+                                            <div>
+                                                <div style={{ fontSize: "13px", fontWeight: "600" }}>Attendance</div>
+                                                <div style={{ fontSize: "11px", color: "#9ca3af" }}>Biometric log</div>
+                                            </div>
+                                        </button>
+
+                                        <button onClick={() => { setActiveSidebarTab("engagement"); setMobilePanelOpen(true); setActiveMobileSheet(null); }} style={{
+                                            display: "flex", alignItems: "center", gap: "10px", padding: "14px 12px",
+                                            background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
+                                            borderRadius: "12px", color: "white", cursor: "pointer", textAlign: "left"
+                                        }}>
+                                            <span style={{ fontSize: "22px" }}>📈</span>
+                                            <div>
+                                                <div style={{ fontSize: "13px", fontWeight: "600" }}>Engage Score</div>
+                                                <div style={{ fontSize: "11px", color: "#9ca3af" }}>Attention trend</div>
+                                            </div>
+                                        </button>
+
+                                        <button onClick={() => { setShowSummaryModal(true); setActiveMobileSheet(null); }} style={{
+                                            display: "flex", alignItems: "center", gap: "10px", padding: "14px 12px",
+                                            background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
+                                            borderRadius: "12px", color: "white", cursor: "pointer", textAlign: "left"
+                                        }}>
+                                            <span style={{ fontSize: "22px" }}>📝</span>
+                                            <div>
+                                                <div style={{ fontSize: "13px", fontWeight: "600" }}>Meeting Summary</div>
+                                                <div style={{ fontSize: "11px", color: "#9ca3af" }}>Generate AI notes</div>
+                                            </div>
+                                        </button>
+                                    </div>
+
+                                    {isHost && (
+                                        <div style={{ borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: "10px", marginTop: "4px", display: "flex", flexDirection: "column", gap: "8px" }}>
+                                            <div style={{ fontSize: "11px", fontWeight: "700", color: "#9ca3af", letterSpacing: "0.05em", textTransform: "uppercase" }}>Host Collaboration</div>
+                                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                                                <button onClick={() => { setActiveSidebarTab("breakout"); setMobilePanelOpen(true); setActiveMobileSheet(null); }} style={{
+                                                    display: "flex", alignItems: "center", gap: "8px", padding: "12px",
+                                                    background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
+                                                    borderRadius: "12px", color: "white", cursor: "pointer"
+                                                }}>
+                                                    <span style={{ fontSize: "18px" }}>🚪</span>
+                                                    <span style={{ fontSize: "12px", fontWeight: "600" }}>Breakout Rooms</span>
+                                                </button>
+                                                <button onClick={() => { setShowWhiteboard(true); setActiveMobileSheet(null); }} style={{
+                                                    display: "flex", alignItems: "center", gap: "8px", padding: "12px",
+                                                    background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
+                                                    borderRadius: "12px", color: "white", cursor: "pointer"
+                                                }}>
+                                                    <span style={{ fontSize: "18px" }}>🖍️</span>
+                                                    <span style={{ fontSize: "12px", fontWeight: "600" }}>Whiteboard</span>
+                                                </button>
+                                            </div>
+                                            <button onClick={() => { isRecording ? stopRecording() : startRecording(); setActiveMobileSheet(null); }} style={{
+                                                display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px",
+                                                background: isRecording ? "rgba(239,68,68,0.2)" : "rgba(255,255,255,0.06)",
+                                                border: `1px solid ${isRecording ? "#ef4444" : "rgba(255,255,255,0.1)"}`,
+                                                borderRadius: "12px", color: "white", cursor: "pointer"
+                                            }}>
+                                                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                                                    <span style={{ fontSize: "18px" }}>{isRecording ? "⏹️" : "⏺️"}</span>
+                                                    <span style={{ fontSize: "13px", fontWeight: "600" }}>{isRecording ? "Stop Recording" : "Record Meeting"}</span>
+                                                </div>
+                                                <span style={{ fontSize: "12px", color: isRecording ? "#ef4444" : "#9ca3af" }}>{isRecording ? "Recording in progress" : "Start"}</span>
+                                            </button>
+                                        </div>
+                                    )}
+                                </>
+                            )}
+
+                            {activeMobileSheet === 'view' && (
+                                <>
+                                    <button onClick={() => setCaptionsEnabled(v => !v)} style={{
+                                        display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px",
+                                        background: captionsEnabled ? "rgba(59,130,246,0.15)" : "rgba(255,255,255,0.06)",
+                                        border: `1px solid ${captionsEnabled ? "#3b82f6" : "rgba(255,255,255,0.1)"}`,
+                                        borderRadius: "12px", color: "white", cursor: "pointer"
+                                    }}>
+                                        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                                            <span style={{ fontSize: "20px" }}>💬</span>
+                                            <div>
+                                                <div style={{ fontSize: "13px", fontWeight: "600" }}>Live Captions (Whisper AI)</div>
+                                                <div style={{ fontSize: "11px", color: "#9ca3af" }}>Local offline speech-to-text transcript</div>
+                                            </div>
+                                        </div>
+                                        <span style={{ color: captionsEnabled ? "#60a5fa" : "#9ca3af", fontSize: "12px", fontWeight: "bold" }}>{captionsEnabled ? "ON" : "OFF"}</span>
+                                    </button>
+
+                                    <button onClick={() => { setPinnedId(null); setActiveMobileSheet(null); }} style={{
+                                        display: "flex", alignItems: "center", gap: "12px", padding: "14px 16px",
+                                        background: pinnedId === null ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.06)",
+                                        border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", color: "white", cursor: "pointer"
+                                    }}>
+                                        <span style={{ fontSize: "20px" }}>🔠</span>
+                                        <div>
+                                            <div style={{ fontSize: "13px", fontWeight: "600" }}>Grid View</div>
+                                            <div style={{ fontSize: "11px", color: "#9ca3af" }}>Balanced video grid for all participants</div>
+                                        </div>
+                                    </button>
+
+                                    <button onClick={() => { togglePiP(); setActiveMobileSheet(null); }} style={{
+                                        display: "flex", alignItems: "center", gap: "12px", padding: "14px 16px",
+                                        background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
+                                        borderRadius: "12px", color: "white", cursor: "pointer"
+                                    }}>
+                                        <span style={{ fontSize: "20px" }}>🪟</span>
+                                        <div>
+                                            <div style={{ fontSize: "13px", fontWeight: "600" }}>Picture-in-Picture</div>
+                                            <div style={{ fontSize: "11px", color: "#9ca3af" }}>Floating video window outside browser</div>
+                                        </div>
+                                    </button>
+
+                                    <button onClick={() => { toggleFullscreen(); setActiveMobileSheet(null); }} style={{
+                                        display: "flex", alignItems: "center", gap: "12px", padding: "14px 16px",
+                                        background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
+                                        borderRadius: "12px", color: "white", cursor: "pointer"
+                                    }}>
+                                        <span style={{ fontSize: "20px" }}>{isFullscreen ? "⊡" : "⛶"}</span>
+                                        <div>
+                                            <div style={{ fontSize: "13px", fontWeight: "600" }}>{isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}</div>
+                                            <div style={{ fontSize: "11px", color: "#9ca3af" }}>Maximize meeting screen</div>
+                                        </div>
+                                    </button>
+
+                                    <button onClick={() => { setShowSettings(true); setActiveMobileSheet(null); }} style={{
+                                        display: "flex", alignItems: "center", gap: "12px", padding: "14px 16px",
+                                        background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
+                                        borderRadius: "12px", color: "white", cursor: "pointer"
+                                    }}>
+                                        <span style={{ fontSize: "20px" }}>⚙️</span>
+                                        <div>
+                                            <div style={{ fontSize: "13px", fontWeight: "600" }}>Device Settings</div>
+                                            <div style={{ fontSize: "11px", color: "#9ca3af" }}>Camera, microphone and audio outputs</div>
+                                        </div>
+                                    </button>
+
+                                    <button onClick={() => { setShowInfo(true); setActiveMobileSheet(null); }} style={{
+                                        display: "flex", alignItems: "center", gap: "12px", padding: "14px 16px",
+                                        background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
+                                        borderRadius: "12px", color: "white", cursor: "pointer"
+                                    }}>
+                                        <span style={{ fontSize: "20px" }}>📋</span>
+                                        <div>
+                                            <div style={{ fontSize: "13px", fontWeight: "600" }}>Meeting Info & Share Link</div>
+                                            <div style={{ fontSize: "11px", color: "#9ca3af" }}>Copy link and meeting credentials</div>
+                                        </div>
+                                    </button>
+
+                                    <button onClick={() => setTheme(t => t === "dark" ? "light" : "dark")} style={{
+                                        display: "flex", alignItems: "center", gap: "12px", padding: "14px 16px",
+                                        background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
+                                        borderRadius: "12px", color: "white", cursor: "pointer"
+                                    }}>
+                                        <span style={{ fontSize: "20px" }}>{theme === "dark" ? "☀️" : "🌙"}</span>
+                                        <div>
+                                            <div style={{ fontSize: "13px", fontWeight: "600" }}>{theme === "dark" ? "Switch to Light Theme" : "Switch to Dark Theme"}</div>
+                                            <div style={{ fontSize: "11px", color: "#9ca3af" }}>Toggle application color scheme</div>
+                                        </div>
+                                    </button>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* ── Remote incoming scam alert toast ── */}
             {incomingAlert && (
@@ -1291,18 +1890,28 @@ function CtrlBtn({ onClick, active, title, children, activeColor }: {
     )
 }
 
-function DropUpMenu({ title, icon, children, badge }: { title: string, icon: React.ReactNode, children: React.ReactNode, badge?: string }) {
+function DropUpMenu({ title, icon, children, badge, onMobileClick }: {
+    title: string; icon: React.ReactNode; children: React.ReactNode; badge?: string; onMobileClick?: () => void
+}) {
     const [open, setOpen] = useState(false);
     return (
         <div style={{ position: "relative" }} onMouseLeave={() => setOpen(false)}>
             <button 
-                onClick={() => setOpen(!open)}
+                onClick={(e) => {
+                    if (typeof window !== 'undefined' && window.innerWidth <= 768 && onMobileClick) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onMobileClick();
+                        return;
+                    }
+                    setOpen(!open);
+                }}
                 style={{ 
                     background: open ? "rgba(255,255,255,0.15)" : "transparent",
                     color: "white", border: "none", cursor: "pointer", 
                     display: "flex", flexDirection: "column", alignItems: "center", 
                     justifyContent: "center", gap: "2px", padding: "8px 12px", borderRadius: "8px",
-                    transition: "background 0.2s"
+                    transition: "background 0.2s", minWidth: "48px", minHeight: "48px"
                 }}
                 onMouseEnter={e => { if(!open) e.currentTarget.style.background = "rgba(255,255,255,0.08)" }}
                 onMouseLeave={e => { if(!open) e.currentTarget.style.background = "transparent" }}
@@ -1311,7 +1920,7 @@ function DropUpMenu({ title, icon, children, badge }: { title: string, icon: Rea
                     {icon}
                     {badge && <span style={{ position: "absolute", top: -4, right: -8, background: "#ef4444", color: "white", fontSize: "9px", padding: "1px 4px", borderRadius: "8px", fontWeight: "bold" }}>{badge}</span>}
                 </div>
-                <div style={{ fontSize: "11px", color: "#d1d5db", fontWeight: 500 }}>{title}</div>
+                <div style={{ fontSize: "11px", color: "#d1d5db", fontWeight: 500, whiteSpace: "nowrap" }}>{title}</div>
             </button>
             {open && (
                 <div style={{ 

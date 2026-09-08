@@ -7,8 +7,8 @@ import { Providers } from "@/components/Providers";
 import SuppressWasmAbort from "@/components/SuppressWasmAbort";
 
 export const metadata: Metadata = {
-  title: "AEXIS — Realistic & Futuristic Comms",
-  description: "Aexis: The state-of-the-art AI-native communication platform featuring neural engagement and seamless connection.",
+  title: "CLARIVOX — Secure AI Video Platform",
+  description: "CLARIVOX: The state-of-the-art AI-native communication platform featuring real-time deepfake and scam defense.",
   manifest: "/manifest.json",
 };
 

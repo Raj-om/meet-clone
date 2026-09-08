@@ -132,9 +132,9 @@ export default function LoginPage() {
               background: "linear-gradient(135deg, #c084fc, #818cf8, #06b6d4)",
               WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
               marginBottom: "0.2rem", margin: 0,
-            }}>AEXIS</h1>
+            }}>CLARIVOX</h1>
             <p style={{ color: "rgba(255,255,255,0.4)", fontSize: "0.82rem", marginTop: 4 }}>
-              Sign in to your Aexis account
+              Sign in to your Clarivox account
             </p>
           </div>
 

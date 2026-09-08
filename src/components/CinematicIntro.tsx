@@ -399,7 +399,7 @@ export function CinematicIntro({ onComplete }: { onComplete: () => void }) {
               animate={{ opacity: [0.2, 0.5, 0.2] }}
               transition={{ duration: 3, repeat: Infinity }}
               style={{ color: "rgba(255,255,255,0.3)", fontSize: 9, letterSpacing: 5, marginTop: 20, textTransform: "uppercase" }}>
-              AEXIS · Neural Interface · v2.0
+              CLARIVOX · Neural Interface · v2.0
             </motion.p>
           </motion.div>
         )}
@@ -593,7 +593,7 @@ export function CinematicIntro({ onComplete }: { onComplete: () => void }) {
                 }}
               />
 
-              {/* AEXIS Logo */}
+              {/* CLARIVOX Logo */}
               <motion.div
                 initial={{ opacity: 0, y: 30, scale: 0.8 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -604,7 +604,7 @@ export function CinematicIntro({ onComplete }: { onComplete: () => void }) {
                   background: "linear-gradient(135deg, #ffffff, #a855f7, #00f0ff)",
                   WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
                   filter: "drop-shadow(0 0 12px rgba(120,50,255,0.9))",
-                }}>AEXIS</div>
+                }}>CLARIVOX</div>
                 <motion.div
                   initial={{ opacity: 0, scaleX: 0 }}
                   animate={{ opacity: 1, scaleX: 1 }}
