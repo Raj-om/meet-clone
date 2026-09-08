@@ -8,6 +8,7 @@ import bcrypt from "bcryptjs"
 const prisma = new PrismaClient()
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+    secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || "aexis-jwt-secret-meet-clone-production-2026",
     adapter: PrismaAdapter(prisma),
     session: { strategy: "jwt" },
     providers: [

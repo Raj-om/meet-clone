@@ -81,8 +81,13 @@ function CustomCursor() {
   const sy = useSpring(cy, { stiffness: 400, damping: 25 });
   const [hovered, setHovered] = useState(false);
   const [clicked, setClicked] = useState(false);
+  const [isTouch, setIsTouch] = useState(false);
 
   useEffect(() => {
+    if (typeof window !== "undefined" && ("ontouchstart" in window || navigator.maxTouchPoints > 0)) {
+      setIsTouch(true);
+      return;
+    }
     const move = (e: MouseEvent) => { cx.set(e.clientX); cy.set(e.clientY); };
     const down = () => setClicked(true);
     const up = () => setClicked(false);
@@ -101,6 +106,8 @@ function CustomCursor() {
       window.removeEventListener("mouseup", up);
     };
   }, [cx, cy]);
+
+  if (isTouch) return null;
 
   return (
     <>
@@ -202,11 +209,8 @@ export default function Home() {
   const [mounted, setMounted] = useState(false);
   const [time, setTime] = useState("");
   const { triggerThunder } = useThunder();
-  // Check sessionStorage so intro only plays once per session
-  const [introFinished, setIntroFinished] = useState(() => {
-    if (typeof window === 'undefined') return true;
-    return sessionStorage.getItem('aexis-intro-done') === '1';
-  });
+  // Intro finished by default for immediate responsiveness
+  const [introFinished, setIntroFinished] = useState(true);
 
   useEffect(() => {
     setMounted(true);
@@ -224,37 +228,52 @@ export default function Home() {
     setIntroFinished(true);
   };
 
-  const startNewMeeting = (e: React.MouseEvent<HTMLButtonElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const ox = rect.left + rect.width / 2;
-    const oy = rect.top + rect.height / 2;
-    triggerThunder(ox, oy, () => {
-      const code = Math.floor(100000000 + Math.random() * 900000000).toString();
+  const startNewMeeting = (e?: React.MouseEvent<HTMLButtonElement>) => {
+    const code = Math.floor(100000000 + Math.random() * 900000000).toString();
+    try {
       sessionStorage.setItem(`meet-host-${code}`, "true");
-      router.push(`/meet/${code}/lobby`);
-    });
+    } catch (err) {
+      console.warn("Storage warning:", err);
+    }
+    // Visual feedback without blocking navigation
+    try {
+      if (e?.currentTarget) {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const ox = rect.left + rect.width / 2;
+        const oy = rect.top + rect.height / 2;
+        triggerThunder(ox, oy, () => {});
+      }
+    } catch (err) {
+      console.warn("Thunder visual error:", err);
+    }
+    router.push(`/meet/${code}/lobby`);
   };
 
   const joinMeeting = (e?: React.MouseEvent<HTMLButtonElement>) => {
     const code = meetingCode.trim().replace(/[^a-zA-Z0-9]/g, "");
     if (!code) return;
-    if (e?.currentTarget) {
-      const rect = e.currentTarget.getBoundingClientRect();
-      const ox = rect.left + rect.width / 2;
-      const oy = rect.top + rect.height / 2;
-      triggerThunder(ox, oy, () => {
-        router.push(`/meet/${code}/lobby`);
-      });
-    } else {
-      router.push(`/meet/${code}/lobby`);
+    try {
+      if (e?.currentTarget) {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const ox = rect.left + rect.width / 2;
+        const oy = rect.top + rect.height / 2;
+        triggerThunder(ox, oy, () => {});
+      }
+    } catch (err) {
+      console.warn("Thunder visual error:", err);
     }
+    router.push(`/meet/${code}/lobby`);
   };
 
   const installApp = async () => {
     if (!installPrompt) { router.push("/install"); return; }
-    await installPrompt.prompt();
-    const { outcome } = await installPrompt.userChoice;
-    if (outcome === "accepted") setInstallPrompt(null);
+    try {
+      await installPrompt.prompt();
+      const { outcome } = await installPrompt.userChoice;
+      if (outcome === "accepted") setInstallPrompt(null);
+    } catch {
+      router.push("/install");
+    }
   };
 
   const firstName = session?.user?.name?.trim().split(/\s+/)[0] || "GUEST";
@@ -263,15 +282,12 @@ export default function Home() {
 
   return (
     <>
-      {!introFinished && <CinematicIntro onComplete={handleIntroComplete} />}
       <div style={{
         width: "100vw", height: "100vh", background: "#020818",
-        overflow: "hidden", position: "relative", cursor: "none",
+        overflow: "hidden", position: "relative", cursor: "default",
         fontFamily: "'Inter', sans-serif", color: "#fff",
-        // Use opacity+pointerEvents instead of display:none to avoid hydration issues
-        opacity: introFinished ? 1 : 0,
-        pointerEvents: introFinished ? "auto" : "none",
-        transition: "opacity 0.5s ease"
+        opacity: 1,
+        pointerEvents: "auto",
       }}>
         <CustomCursor />
         
@@ -306,13 +322,13 @@ export default function Home() {
 
           {/* Auth actions */}
           <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-            <motion.button className="spatial-btn" onClick={installApp}>
+            <motion.button className="spatial-btn" onClick={installApp} style={{ cursor: "pointer" }}>
               {installPrompt ? "Install App" : "Desktop App"}
             </motion.button>
 
             {session?.user ? (
               <motion.button className="spatial-btn" onClick={() => signOut()}
-                style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 16px" }}>
+                style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", cursor: "pointer" }}>
                 <span style={{
                   width: 24, height: 24, background: "#fff", color: "#000", borderRadius: "50%",
                   display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700
@@ -320,7 +336,7 @@ export default function Home() {
                 {firstName}
               </motion.button>
             ) : (
-              <motion.button className="spatial-btn spatial-btn-primary" onClick={() => router.push("/login")}>
+              <motion.button className="spatial-btn spatial-btn-primary" onClick={() => router.push("/login")} style={{ cursor: "pointer" }}>
                 Sign In
               </motion.button>
             )}
@@ -335,7 +351,8 @@ export default function Home() {
           style={{
             position: "absolute", top: "50%", left: "50%",
             padding: "48px 40px", width: "min(440px, 92vw)",
-            display: "flex", flexDirection: "column", alignItems: "center"
+            display: "flex", flexDirection: "column", alignItems: "center",
+            zIndex: 10
           }}>
           
           <h2 className="text-gradient" style={{ 
@@ -350,7 +367,7 @@ export default function Home() {
             whileHover={{ scale: 1.03, boxShadow: "0 0 30px rgba(0,200,255,0.4), 0 0 60px rgba(0,100,255,0.2)" }}
             whileTap={{ scale: 0.97 }}
             style={{ width: "100%", height: 52, display: "flex", gap: 10, fontSize: 15,
-              boxShadow: "0 4px 20px rgba(255,255,255,0.1)", transition: "box-shadow 0.3s ease" }}>
+              boxShadow: "0 4px 20px rgba(255,255,255,0.1)", transition: "box-shadow 0.3s ease", cursor: "pointer" }}>
             <VideoIcon style={{ width: 20 }} />
             New Secure Call
           </motion.button>
