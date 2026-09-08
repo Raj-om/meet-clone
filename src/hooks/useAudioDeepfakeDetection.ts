@@ -215,6 +215,10 @@ export function useAudioDeepfakeDetection({
                 : finalScore >= 30 ? "Possibly Synthetic"
                     : "Natural Voice"
 
+        if (process.env.NODE_ENV !== "test") {
+            console.log(`🎙️ [AI Defense - Audio] Voice Score: ${finalScore}% | Status: ${newLabel} | Floor: ${Math.round(floorDb)}dB`)
+        }
+
         setScore(finalScore)
         setLabel(newLabel)
         updateScore("voice", Math.max(finalScore, 0))  // feeds into scam scoring voice signal

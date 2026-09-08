@@ -109,6 +109,10 @@ export function useDireDetection({
             const newScore = data.score ?? 0
             const newLabel: DireLabel = data.label ?? "Likely Real"
 
+            if (process.env.NODE_ENV !== "test") {
+                console.log(`🔬 [AI Defense - DIRE] Frequency Domain Score: ${newScore}% | Status: ${newLabel} | Mode: ${data.mode ?? 'Cloud Native'}`)
+            }
+
             setScore(newScore)
             setLabel(newLabel)
             setMode(data.mode ?? "DCT Heuristic")

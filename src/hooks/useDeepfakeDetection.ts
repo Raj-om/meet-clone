@@ -203,6 +203,10 @@ export function useDeepfakeDetection({
                 : score >= 30 ? "Suspicious"
                     : "Real"
 
+        if (process.env.NODE_ENV !== "test") {
+            console.log(`🛡️ [AI Defense - Video] Deepfake Score: ${score}% | Status: ${newLabel}`)
+        }
+
         setLabel(newLabel)
         setConfidence(score)
         updateScore("deepfake", score)

@@ -670,11 +670,10 @@ export default function MeetingPage({ params }: { params: Promise<{ id: string }
 
     // Base tabs available in all modes
     let sidebarTabs: { key: SidebarTab; icon: string; label: string }[] = [
+        { key: 'scam' as SidebarTab, icon: '🛡️', label: 'AI Security' },
         { key: 'chat', icon: '💬', label: 'Chat' },
         { key: 'participants', icon: '👥', label: 'People' }
     ]
-
-    // We removed 'office' specific sidebar tabs because they are now launched from the bottom control bar menus.
 
     if (roomMode === 'classroom') {
         sidebarTabs.push(
@@ -695,8 +694,8 @@ export default function MeetingPage({ params }: { params: Promise<{ id: string }
 
     // Restrict student sidebars
     if (!isHost) {
-        // Students only see limited tabs
-        sidebarTabs = sidebarTabs.filter(tab => !['scam', 'graph', 'breakout', 'engagement', 'exam_panel'].includes(tab.key))
+        // Students only see limited tabs (preserve AI Security for personal defense)
+        sidebarTabs = sidebarTabs.filter(tab => !['graph', 'breakout', 'engagement', 'exam_panel'].includes(tab.key))
         
         // Hide Chat and Polls in Exam Mode
         if (roomMode === 'exam') {
