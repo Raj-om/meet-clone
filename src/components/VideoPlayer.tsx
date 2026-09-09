@@ -27,8 +27,31 @@ const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(
         useEffect(() => {
             if (videoRef.current && stream) {
                 videoRef.current.srcObject = stream;
-                videoRef.current.play().catch(() => {});
+                if (!muted) {
+                    videoRef.current.volume = 1.0;
+                }
+                const playPromise = videoRef.current.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch((err) => {
+                        console.warn("[VideoPlayer] Autoplay waiting for user gesture:", err);
+                    });
+                }
             }
+        }, [stream, videoRef, muted])
+
+        // Resume playback on user click/tap if browser autoplay policy blocked unmuted remote audio
+        useEffect(() => {
+            const unlockAudio = () => {
+                if (videoRef.current && videoRef.current.paused && stream) {
+                    videoRef.current.play().catch(() => {});
+                }
+            };
+            window.addEventListener("click", unlockAudio);
+            window.addEventListener("touchstart", unlockAudio);
+            return () => {
+                window.removeEventListener("click", unlockAudio);
+                window.removeEventListener("touchstart", unlockAudio);
+            };
         }, [stream, videoRef])
 
         useEffect(() => {
@@ -86,32 +109,44 @@ const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(
                     transition: "all 0.4s cubic-bezier(0.2, 0, 0, 1)",
                 }}
             >
+                {/* Video element remains active in DOM so audio is NEVER muted/suspended by display:none */}
                 <video
                     ref={videoRef}
                     autoPlay
                     playsInline
                     muted={muted}
                     style={{
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
                         width: "100%",
                         height: "100%",
                         objectFit: "cover",
                         transform: muted ? "scaleX(-1)" : "none",
                         borderRadius: "10px",
                         filter: isHighRisk ? "contrast(1.2) saturate(1.5) sepia(0.3) hue-rotate(-20deg)" : "none",
-                        transition: "filter 0.3s ease",
-                        display: hasVideo ? "block" : "none"
+                        transition: "opacity 0.3s ease, filter 0.3s ease",
+                        opacity: hasVideo ? 1 : 0,
+                        zIndex: hasVideo ? 1 : 0,
                     }}
                 />
 
-                {/* Intentional Camera-Off / Connecting State */}
+                {/* Intentional Camera-Off / Connecting State (visible when video track is not live) */}
                 {!hasVideo && (
                     <div style={{
-                        width: "100%", height: "100%",
-                        display: "flex", flexDirection: "column",
-                        alignItems: "center", justifyContent: "center",
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        width: "100%",
+                        height: "100%",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
                         gap: "10px",
                         background: "radial-gradient(circle at 50% 50%, #1e1b4b 0%, #0d0e15 70%, #06070a 100%)",
                         borderRadius: "14px",
+                        zIndex: 1,
                     }}>
                         <div style={{
                             width: "64px", height: "64px", borderRadius: "50%",

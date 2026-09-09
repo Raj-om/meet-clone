@@ -165,16 +165,23 @@ app.prepare().then(() => {
                 lastEventTime = now;
             }
             eventCount++;
-            if (eventCount > 100) { // Max 100 events per second
+            if (eventCount > 250) { // Max 250 events per second (allow burst of ICE candidates)
                 console.warn(`[FIREWALL] 🛑 Socket ${socket.id} blocked for spamming.`);
                 socket.disconnect(true); // Abrupt connection termination
                 return next(new Error("Rate limit exceeded"));
             }
 
+            // WebRTC media signaling and whiteboard protocol events bypass text sanitization
+            // (SDP offers/answers can be 15,000+ characters and must not have HTML-regex alteration)
+            const webrtcBypassEvents = ["offer", "answer", "ice-candidate", "whiteboard-draw", "status-update"];
+            if (webrtcBypassEvents.includes(event)) {
+                return next();
+            }
+
             // 2. Deep Payload Inspection & Sanitization
             const sanitize = (obj) => {
                 if (typeof obj === 'string') {
-                    if (obj.length > 5000) { // Prevent Buffer Overflow attacks
+                    if (obj.length > 10000) { // Prevent Buffer Overflow attacks
                         throw new Error("Payload too large");
                     }
                     // Strip dangerous HTML/Script tags (Basic XSS protection)
@@ -308,13 +315,28 @@ app.prepare().then(() => {
 
         // ── WebRTC Signaling ─────────────────────────────────────────────────
         socket.on("offer", (offer, roomId, targetId, senderId) => {
-            socket.to(roomId).emit("offer", offer, targetId, senderId);
+            const target = roomParticipants[roomId]?.get(targetId);
+            if (target && target.socketId) {
+                io.to(target.socketId).emit("offer", offer, targetId, senderId);
+            } else {
+                socket.to(roomId).emit("offer", offer, targetId, senderId);
+            }
         });
         socket.on("answer", (answer, roomId, targetId, senderId) => {
-            socket.to(roomId).emit("answer", answer, targetId, senderId);
+            const target = roomParticipants[roomId]?.get(targetId);
+            if (target && target.socketId) {
+                io.to(target.socketId).emit("answer", answer, targetId, senderId);
+            } else {
+                socket.to(roomId).emit("answer", answer, targetId, senderId);
+            }
         });
         socket.on("ice-candidate", (candidate, roomId, targetId, senderId) => {
-            socket.to(roomId).emit("ice-candidate", candidate, targetId, senderId);
+            const target = roomParticipants[roomId]?.get(targetId);
+            if (target && target.socketId) {
+                io.to(target.socketId).emit("ice-candidate", candidate, targetId, senderId);
+            } else {
+                socket.to(roomId).emit("ice-candidate", candidate, targetId, senderId);
+            }
         });
 
         // ── Screen sharing ───────────────────────────────────────────────────

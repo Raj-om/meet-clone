@@ -87,7 +87,7 @@ export default function MeetingPage({ params }: { params: Promise<{ id: string }
         (typeof window !== "undefined" ? sessionStorage.getItem("meet-display-name") : null) || "Guest"
     )
 
-    const { localStream, remoteStreams, socket, isScreenSharing, startScreenShare, stopScreenShare, peersRef, replaceVideoTrackOnAllPeers } = useWebRTC(meetingId, userId)
+    const { localStream, remoteStreams, socket, isScreenSharing, startScreenShare, stopScreenShare, peersRef, replaceVideoTrackOnAllPeers, replaceAudioTrackOnAllPeers } = useWebRTC(meetingId, userId)
     const router = useRouter()
 
     // Connect to Nervous System Event Bus
@@ -126,14 +126,14 @@ export default function MeetingPage({ params }: { params: Promise<{ id: string }
     )
     const finalLocalStream = bgStream || noiseGatedStream || localStream
 
-
-
     useEffect(() => {
         if (finalLocalStream && !isScreenSharing) {
-            const track = finalLocalStream.getVideoTracks()[0]
-            if (track) replaceVideoTrackOnAllPeers(track)
+            const videoTrack = finalLocalStream.getVideoTracks()[0]
+            if (videoTrack) replaceVideoTrackOnAllPeers(videoTrack)
+            const audioTrack = finalLocalStream.getAudioTracks()[0]
+            if (audioTrack) replaceAudioTrackOnAllPeers(audioTrack)
         }
-    }, [finalLocalStream, isScreenSharing, replaceVideoTrackOnAllPeers])
+    }, [finalLocalStream, isScreenSharing, replaceVideoTrackOnAllPeers, replaceAudioTrackOnAllPeers])
 
     useEffect(() => {
         document.documentElement.setAttribute("data-theme", theme)

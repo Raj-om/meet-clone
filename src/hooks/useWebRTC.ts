@@ -51,9 +51,29 @@ export const useWebRTC = (roomId: string, userId: string) => {
                 const videoSender = senders.find(s => s.track && s.track.kind === "video")
                 if (videoSender) {
                     await videoSender.replaceTrack(track)
+                } else if (localStreamRef.current) {
+                    pc.addTrack(track, localStreamRef.current)
                 }
             } catch (err) {
-                console.warn(`[WebRTC] Failed to replace track for peer ${peerId}:`, err)
+                console.warn(`[WebRTC] Failed to replace video track for peer ${peerId}:`, err)
+            }
+        }
+    }, [])
+
+    // Helper to replace audio track across all active WebRTC peers
+    const replaceAudioTrackOnAllPeers = useCallback(async (track?: MediaStreamTrack) => {
+        if (!track) return
+        for (const [peerId, pc] of Object.entries(peersRef.current)) {
+            try {
+                const senders = pc.getSenders()
+                const audioSender = senders.find(s => s.track && s.track.kind === "audio")
+                if (audioSender) {
+                    await audioSender.replaceTrack(track)
+                } else if (localStreamRef.current) {
+                    pc.addTrack(track, localStreamRef.current)
+                }
+            } catch (err) {
+                console.warn(`[WebRTC] Failed to replace audio track for peer ${peerId}:`, err)
             }
         }
     }, [])
@@ -86,24 +106,26 @@ export const useWebRTC = (roomId: string, userId: string) => {
 
         // Receive remote audio/video tracks
         pc.ontrack = (event) => {
-            const stream = event.streams[0] || new MediaStream([event.track])
+            console.log(`[WebRTC] Received ${event.track.kind} track from ${targetUserId}`)
             setRemoteStreams(prev => {
                 const existing = prev[targetUserId]
                 if (existing) {
-                    // Avoid creating new MediaStream reference if track already exists
                     if (!existing.getTracks().some(t => t.id === event.track.id)) {
                         existing.addTrack(event.track)
                     }
-                    return { ...prev, [targetUserId]: existing }
+                    // Return a new MediaStream instance so React updates child component props and triggers video.srcObject
+                    return { ...prev, [targetUserId]: new MediaStream(existing.getTracks()) }
                 }
-                return { ...prev, [targetUserId]: stream }
+                const newStream = event.streams[0] ? new MediaStream(event.streams[0].getTracks()) : new MediaStream([event.track])
+                return { ...prev, [targetUserId]: newStream }
             })
         }
 
         pc.onconnectionstatechange = () => {
             console.log(`[WebRTC] Peer ${targetUserId} state:`, pc.connectionState)
-            if (pc.connectionState === "disconnected" || pc.connectionState === "failed" || pc.connectionState === "closed") {
-                // Connection dropped
+            if (pc.connectionState === "failed") {
+                console.log(`[WebRTC] Attempting ICE restart for ${targetUserId}`)
+                pc.restartIce?.()
             }
         }
 
@@ -115,41 +137,32 @@ export const useWebRTC = (roomId: string, userId: string) => {
         const socket = io()
         socketRef.current = socket
 
-        // Initialize local camera
-        const initCamera = async () => {
+        // Ensure camera & microphone are active BEFORE joining room so tracks are attached to the initial offer/answer
+        const startSession = async () => {
+            let stream: MediaStream | null = null
             const isCompanion = typeof window !== "undefined" && sessionStorage.getItem("meet-companion-mode") === "true"
+
             if (isCompanion) {
-                const empty = new MediaStream()
-                localStreamRef.current = empty
-                if (isMounted) setLocalStream(empty)
-                return
-            }
-
-            try {
-                const stream = await cameraManager.getStream()
-                localStreamRef.current = stream
-                if (isMounted) setLocalStream(stream)
-
-                // If peers already connected before camera was ready, attach tracks now
-                for (const pc of Object.values(peersRef.current)) {
-                    stream.getTracks().forEach(track => {
-                        try {
-                            pc.addTrack(track, stream)
-                        } catch (e) {
-                            console.warn(e)
-                        }
-                    })
+                stream = new MediaStream()
+            } else {
+                try {
+                    stream = await cameraManager.getStream()
+                } catch (err) {
+                    console.warn("[WebRTC] Direct camera access error, creating fallback stream:", err)
+                    stream = new MediaStream()
                 }
-            } catch (err) {
-                console.warn("[WebRTC] Direct camera access error:", err)
             }
+
+            if (!isMounted) return
+            localStreamRef.current = stream
+            setLocalStream(stream)
+
+            // Emit join-room ONLY AFTER local camera & mic stream is acquired
+            const displayName = (typeof window !== "undefined" ? sessionStorage.getItem("meet-display-name") : null) || "Guest"
+            socket.emit("join-room", roomId, userId, displayName)
         }
 
-        initCamera()
-
-        // Socket Join
-        const displayName = (typeof window !== "undefined" ? sessionStorage.getItem("meet-display-name") : null) || "Guest"
-        socket.emit("join-room", roomId, userId, displayName)
+        startSession()
 
         // When a new remote user connects: We are the caller, initiate Offer
         socket.on("user-connected", async (newUserId: string) => {
@@ -158,6 +171,16 @@ export const useWebRTC = (roomId: string, userId: string) => {
 
             try {
                 const pc = createPeerConnection(newUserId, socket)
+
+                // Ensure all local tracks are attached before creating offer
+                if (localStreamRef.current) {
+                    localStreamRef.current.getTracks().forEach(track => {
+                        if (!pc.getSenders().some(s => s.track?.id === track.id)) {
+                            try { pc.addTrack(track, localStreamRef.current!) } catch (e) {}
+                        }
+                    })
+                }
+
                 const offer = await pc.createOffer({
                     offerToReceiveAudio: true,
                     offerToReceiveVideo: true
@@ -176,6 +199,16 @@ export const useWebRTC = (roomId: string, userId: string) => {
 
             try {
                 const pc = createPeerConnection(senderId, socket)
+
+                // Ensure all local tracks are attached before creating answer
+                if (localStreamRef.current) {
+                    localStreamRef.current.getTracks().forEach(track => {
+                        if (!pc.getSenders().some(s => s.track?.id === track.id)) {
+                            try { pc.addTrack(track, localStreamRef.current!) } catch (e) {}
+                        }
+                    })
+                }
+
                 await pc.setRemoteDescription(new RTCSessionDescription(offer))
 
                 // Apply any queued candidates
@@ -307,5 +340,6 @@ export const useWebRTC = (roomId: string, userId: string) => {
         stopScreenShare,
         peersRef,
         replaceVideoTrackOnAllPeers,
+        replaceAudioTrackOnAllPeers,
     }
 }

@@ -50,10 +50,21 @@ class CameraManager {
                     try {
                         s = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
                     } catch (e2) {
-                        // Strategy 3: Video only (in case mic is blocked or in use)
+                        // Strategy 3: Video only (in case mic has strict constraints)
                         s = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
                     }
                 }
+
+                // If microphone wasn't included or was dropped by browser, attempt standalone audio acquisition
+                if (s && s.getAudioTracks().length === 0) {
+                    try {
+                        const audioOnly = await navigator.mediaDevices.getUserMedia({ audio: true });
+                        audioOnly.getAudioTracks().forEach(track => s!.addTrack(track));
+                    } catch (audioErr) {
+                        console.warn("CameraManager: Microphone not available or denied:", audioErr);
+                    }
+                }
+
                 this.stream = s;
                 resolve(s);
             } catch (err) {
