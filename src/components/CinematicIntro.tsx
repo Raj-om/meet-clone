@@ -356,6 +356,30 @@ export function CinematicIntro({ onComplete }: { onComplete: () => void }) {
       background: "#00000f", overflow: "hidden",
       display: "flex", alignItems: "center", justifyContent: "center",
     }}>
+      {/* Skip button */}
+      <button
+        onClick={onComplete}
+        style={{
+          position: "absolute",
+          top: 24,
+          right: 28,
+          zIndex: 1000,
+          background: "rgba(255, 255, 255, 0.08)",
+          border: "1px solid rgba(255, 255, 255, 0.2)",
+          color: "rgba(255, 255, 255, 0.75)",
+          borderRadius: 20,
+          padding: "8px 16px",
+          fontSize: 12,
+          fontWeight: 600,
+          letterSpacing: 1,
+          cursor: "pointer",
+          backdropFilter: "blur(12px)",
+          transition: "all 0.2s ease"
+        }}
+      >
+        Skip ✕
+      </button>
+
       {/* Canvas layer */}
       <canvas ref={canvasRef} style={{ position: "absolute", inset: 0, zIndex: 1 }} />
 

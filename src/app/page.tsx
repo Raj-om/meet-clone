@@ -210,11 +210,18 @@ export default function Home() {
   const [mounted, setMounted] = useState(false);
   const [time, setTime] = useState("");
   const { triggerThunder } = useThunder();
-  // Intro finished by default for immediate responsiveness
+  // Cinematic intro state (shows on first visit or when user clicks '🎬 Intro')
   const [introFinished, setIntroFinished] = useState(true);
 
   useEffect(() => {
     setMounted(true);
+    try {
+      if (sessionStorage.getItem('clarivox-intro-done') !== '1') {
+        setIntroFinished(false);
+      }
+    } catch (e) {
+      // Storage access disabled / private browsing
+    }
     const handleInstall = (e: Event) => { e.preventDefault(); setInstallPrompt(e as BeforeInstallPromptEvent); };
     window.addEventListener("beforeinstallprompt", handleInstall);
     const tick = setInterval(() => setTime(new Date().toLocaleTimeString("en-US", { hour12: false })), 1000);
@@ -225,7 +232,9 @@ export default function Home() {
   }, []);
 
   const handleIntroComplete = () => {
-    sessionStorage.setItem('aexis-intro-done', '1');
+    try {
+      sessionStorage.setItem('clarivox-intro-done', '1');
+    } catch (e) {}
     setIntroFinished(true);
   };
 
@@ -283,12 +292,14 @@ export default function Home() {
 
   return (
     <>
+      {!introFinished && <CinematicIntro onComplete={handleIntroComplete} />}
       <div style={{
         width: "100vw", height: "100vh", background: "#020818",
         overflow: "hidden", position: "relative", cursor: "default",
         fontFamily: "'Inter', sans-serif", color: "#fff",
-        opacity: 1,
-        pointerEvents: "auto",
+        opacity: introFinished ? 1 : 0,
+        pointerEvents: introFinished ? "auto" : "none",
+        transition: "opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1)",
       }}>
         <CustomCursor />
         
@@ -321,8 +332,27 @@ export default function Home() {
             {time} <span style={{ fontSize: 10, opacity: 0.5 }}>UTC</span>
           </div>
 
-          {/* Auth actions */}
-          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          {/* Auth and Action buttons */}
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            {/* Bollywood Intro Replay Button */}
+            <motion.button
+              className="spatial-btn"
+              onClick={() => setIntroFinished(false)}
+              style={{
+                cursor: "pointer",
+                fontSize: 12,
+                padding: "6px 14px",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+                background: "rgba(124, 58, 237, 0.15)",
+                borderColor: "rgba(167, 139, 250, 0.3)"
+              }}
+              title="Replay Bollywood Cinematic Intro"
+            >
+              🎬 Intro
+            </motion.button>
+
             <motion.button className="spatial-btn" onClick={installApp} style={{ cursor: "pointer", fontSize: 12, padding: "6px 14px" }}>
               {installPrompt ? "Install App" : "Get App"}
             </motion.button>
