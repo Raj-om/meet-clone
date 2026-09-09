@@ -4,8 +4,6 @@ node_modules
 *.log
 .env*.local
 meet-clone_VTU_Project
-*.png
-*.txt
 *.bat
 *.vbs
 *.docx

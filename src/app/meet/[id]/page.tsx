@@ -1029,16 +1029,7 @@ export default function MeetingPage({ params }: { params: Promise<{ id: string }
             {/* ── Main Area ── */}
             <div className="main-area" style={{ flex: 1, padding: "16px", display: "flex", gap: "16px", overflow: "hidden" }}>
                 {/* Video grid */}
-                <div className="video-area" id="video-area-inner" style={{ flex: 1, position: "relative", overflow: "hidden" }}>
-                    {/* Watermarking Overlay (Enterprise Security) */}
-                    <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 50, overflow: "hidden", opacity: 0.03, display: "flex", flexWrap: "wrap", justifyContent: "center", alignContent: "center", gap: "120px", transform: "rotate(-25deg) scale(1.3)" }}>
-                        {Array.from({ length: 16 }).map((_, i) => (
-                            <div key={i} style={{ color: "white", fontSize: "16px", fontWeight: "600", userSelect: "none", whiteSpace: "nowrap", letterSpacing: "1px" }}>
-                                {displayName} ({userId})
-                            </div>
-                        ))}
-                    </div>
-
+                <div className="video-area" id="video-area-inner" style={{ flex: 1, position: "relative", overflow: "hidden", display: "flex", flexDirection: "column", height: "100%", minHeight: 0, width: "100%" }}>
                     {roomMode === 'exam' && !isHost ? (
                         <ExamStudentView
                             examState={exam.examState}
@@ -1080,23 +1071,44 @@ export default function MeetingPage({ params }: { params: Promise<{ id: string }
                                 flexWrap: "wrap",
                                 alignContent: "center",
                                 justifyContent: "center",
-                                gap: "12px", width: "100%", height: "100%"
+                                gap: "12px",
+                                width: "100%",
+                                height: "100%",
+                                minHeight: 0,
+                                flex: 1
                         }}>
-                            {allStreams.map(({ id, stream, label }) => (
-                                <div key={id} onClick={() => setPinnedId(id)} style={{ cursor: "pointer", height: `${gridDimensions.tileHeight}px`, width: `${gridDimensions.tileWidth}px`, transition: "all 0.3s ease" }}>
-                                    <VideoPlayer
-                                        ref={id === 'local' ? localVideoRef : undefined}
-                                        stream={stream}
-                                        muted={id === 'local'}
-                                        label={label}
-                                        isLocal={id === 'local'}
-                                        riskScore={id !== 'local' ? scam.riskScore : undefined}
-                                        deepfakeLabel={id === 'local' ? null : (deepfake.label || null)}
-                                        isActiveSpeaker={activeSpeakerId === id}
-                                        networkQuality={networkQualities[id]?.quality}
-                                    />
-                                </div>
-                            ))}
+                            {allStreams.map(({ id, stream, label }) => {
+                                const hasDim = gridDimensions.tileWidth > 40 && gridDimensions.tileHeight > 40;
+                                return (
+                                    <div
+                                        key={id}
+                                        onClick={() => setPinnedId(id)}
+                                        style={{
+                                            cursor: "pointer",
+                                            width: hasDim ? `${gridDimensions.tileWidth}px` : (allStreams.length === 1 ? "100%" : "calc(50% - 12px)"),
+                                            height: hasDim ? `${gridDimensions.tileHeight}px` : (allStreams.length === 1 ? "100%" : "auto"),
+                                            maxWidth: allStreams.length === 1 ? "960px" : "100%",
+                                            maxHeight: allStreams.length === 1 ? "540px" : "100%",
+                                            minWidth: "260px",
+                                            minHeight: "180px",
+                                            aspectRatio: "16/9",
+                                            transition: "all 0.3s ease"
+                                        }}
+                                    >
+                                        <VideoPlayer
+                                            ref={id === 'local' ? localVideoRef : undefined}
+                                            stream={stream}
+                                            muted={id === 'local'}
+                                            label={label}
+                                            isLocal={id === 'local'}
+                                            riskScore={id !== 'local' ? scam.riskScore : undefined}
+                                            deepfakeLabel={id === 'local' ? null : (deepfake.label || null)}
+                                            isActiveSpeaker={activeSpeakerId === id}
+                                            networkQuality={networkQualities[id]?.quality}
+                                        />
+                                    </div>
+                                );
+                            })}
                         </div>
                     )}
 
