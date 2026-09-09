@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { signOut, useSession } from "next-auth/react";
 import { useEffect, useRef, useState, type SVGProps } from "react";
 import { motion, useMotionValue, useSpring, AnimatePresence } from "framer-motion";
@@ -336,9 +337,14 @@ export default function Home() {
                 <span className="hidden sm:inline">{firstName}</span>
               </motion.button>
             ) : (
-              <motion.button className="spatial-btn spatial-btn-primary" onClick={() => router.push("/login")} style={{ cursor: "pointer", fontSize: 12, padding: "6px 14px" }}>
-                Sign In
-              </motion.button>
+              <>
+                <Link href="/login" className="spatial-btn" style={{ textDecoration: "none", cursor: "pointer", fontSize: 12, padding: "6px 14px", display: "inline-flex", alignItems: "center", color: "#fff" }}>
+                  Sign In
+                </Link>
+                <Link href="/register" className="spatial-btn spatial-btn-primary" style={{ textDecoration: "none", cursor: "pointer", fontSize: 12, padding: "6px 14px", display: "inline-flex", alignItems: "center" }}>
+                  Sign Up
+                </Link>
+              </>
             )}
           </div>
         </motion.nav>

@@ -120,9 +120,9 @@ export default function RegisterPage() {
             <h1 style={{
               fontSize: "clamp(1.3rem, 5vw, 1.65rem)", fontWeight: 800, letterSpacing: -0.5,
               color: "#fff", marginBottom: "0.2rem", margin: 0,
-            }}>Join Aexis</h1>
+            }}>Join Clarivox</h1>
             <p style={{ color: "rgba(255,255,255,0.4)", fontSize: "0.78rem", marginTop: 4 }}>
-              The AI-native video intelligence platform
+              The AI-native secure video platform
             </p>
           </div>
 
@@ -168,7 +168,7 @@ export default function RegisterPage() {
                 fontFamily: "inherit", boxShadow: "0 8px 20px rgba(16,185,129,0.28)",
                 transition: "box-shadow 0.3s ease", opacity: isPending ? 0.7 : 1,
               }}>
-              {isPending ? "Creating account..." : "Create Account →"}
+              {isPending ? "Creating account..." : "Sign Up →"}
             </motion.button>
           </form>
 

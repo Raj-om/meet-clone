@@ -21,14 +21,18 @@ export async function loginAction(prevState: any, formData: FormData) {
             password,
             redirectTo: "/",
         })
-    } catch (error) {
+    } catch (error: any) {
         if (error instanceof AuthError) {
             if (error.type === "CredentialsSignin") {
                 return { error: "Invalid email or password." }
             }
             return { error: "Authentication failed." }
         }
-        throw error // Rethrow to allow Next.js redirect to work!
+        if (error?.message?.includes("NEXT_REDIRECT") || error?.digest?.startsWith("NEXT_REDIRECT")) {
+            throw error // Allow Next.js redirect
+        }
+        console.error("[loginAction error]:", error)
+        return { error: error?.message || "Invalid email or password." }
     }
 
     return { success: true }
@@ -67,11 +71,15 @@ export async function registerAction(prevState: any, formData: FormData) {
             password,
             redirectTo: "/",
         })
-    } catch (error) {
+    } catch (error: any) {
         if (error instanceof AuthError) {
             return { error: "Authentication failed after registration." }
         }
-        throw error
+        if (error?.message?.includes("NEXT_REDIRECT") || error?.digest?.startsWith("NEXT_REDIRECT")) {
+            throw error // Allow Next.js redirect
+        }
+        console.error("[registerAction error]:", error)
+        return { error: error?.message || "Registration failed. Please check your details and try again." }
     }
 
     return { success: true }

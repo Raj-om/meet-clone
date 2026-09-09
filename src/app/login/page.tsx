@@ -198,9 +198,9 @@ export default function LoginPage() {
           </div>
 
           <p style={{ textAlign: "center", marginTop: "1.1rem", fontSize: "0.82rem", color: "rgba(255,255,255,0.4)" }}>
-            New to Aexis?{" "}
+            New to Clarivox?{" "}
             <Link href="/register" style={{ color: "#c084fc", fontWeight: 600, textDecoration: "none" }}>
-              Create account
+              Sign Up
             </Link>
           </p>
         </div>
