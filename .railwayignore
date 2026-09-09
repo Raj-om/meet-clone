@@ -3,5 +3,12 @@ node_modules
 .git
 *.log
 .env*.local
-deepfake-server/__pycache__
-deepfake-server/*.pyc
+meet-clone_VTU_Project
+*.png
+*.txt
+*.bat
+*.vbs
+*.docx
+deepfake_server/__pycache__
+deepfake_server/*.pyc
+deepfake_server/venv

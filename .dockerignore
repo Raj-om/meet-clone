@@ -1,0 +1,14 @@
+node_modules
+.next
+.git
+*.log
+.env*.local
+meet-clone_VTU_Project
+*.png
+*.txt
+*.bat
+*.vbs
+*.docx
+deepfake_server/__pycache__
+deepfake_server/*.pyc
+deepfake_server/venv
