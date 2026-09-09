@@ -1059,14 +1059,15 @@ export default function MeetingPage({ params }: { params: Promise<{ id: string }
                                     muted={pinnedId === 'local'}
                                     label={allStreams.find(s => s.id === (pinnedId || allStreams[0].id))?.label}
                                     isPinned
-                                    deepfakeLabel={(pinnedId || allStreams[0]?.id) === 'local' ? deepfake.label : null}
-                                    riskScore={(pinnedId || allStreams[0]?.id) === 'local' ? scam.riskScore : undefined}
+                                    isLocal={(pinnedId || allStreams[0]?.id) === 'local'}
+                                    deepfakeLabel={(pinnedId || allStreams[0]?.id) === 'local' ? null : null}
+                                    riskScore={undefined}
                                 />
                             </div>
                             <div style={{ height: "100px", display: "flex", gap: "8px", marginTop: "12px", overflowX: "auto" }}>
                                 {allStreams.filter(s => s.id !== (pinnedId || allStreams[0]?.id)).map(({ id, stream, label }) => (
                                     <div key={id} style={{ flexShrink: 0, width: "160px", cursor: "pointer" }} onClick={() => setPinnedId(id)}>
-                                        <VideoPlayer stream={stream} muted={id === 'local'} label={label} />
+                                        <VideoPlayer stream={stream} muted={id === 'local'} label={label} isLocal={id === 'local'} />
                                     </div>
                                 ))}
                             </div>
@@ -1088,8 +1089,9 @@ export default function MeetingPage({ params }: { params: Promise<{ id: string }
                                         stream={stream}
                                         muted={id === 'local'}
                                         label={label}
-                                        riskScore={id === 'local' ? scam.riskScore : undefined}
-                                        deepfakeLabel={id === 'local' ? deepfake.label : null}
+                                        isLocal={id === 'local'}
+                                        riskScore={id !== 'local' ? scam.riskScore : undefined}
+                                        deepfakeLabel={id === 'local' ? null : (deepfake.label || null)}
                                         isActiveSpeaker={activeSpeakerId === id}
                                         networkQuality={networkQualities[id]?.quality}
                                     />

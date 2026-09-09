@@ -1,170 +1,311 @@
 "use client"
 
 import { useEffect, useRef, useState, useCallback } from "react"
-import { io } from "socket.io-client"
-import { Room, RoomEvent, Track, LocalVideoTrack, LocalAudioTrack } from "livekit-client"
+import { io, Socket } from "socket.io-client"
 import { cameraManager } from "@/utils/cameraManager"
 
-// This hook replaces the old Socket.io P2P system with LiveKit SFU,
-// but perfectly preserves the old MediaStream interfaces so the AI/Deepfake models do not break!
+const ICE_CONFIG: RTCConfiguration = {
+    iceServers: [
+        { urls: "stun:stun.l.google.com:19302" },
+        { urls: "stun:stun1.l.google.com:19302" },
+        { urls: "stun:stun2.l.google.com:19302" },
+        { urls: "stun:stun3.l.google.com:19302" },
+        { urls: "stun:stun4.l.google.com:19302" },
+        // Public Free TURN Relays for mobile carriers and restrictive Wi-Fi NAT traversal
+        {
+            urls: "turn:openrelay.metered.ca:80",
+            username: "openrelayproject",
+            credential: "openrelayproject"
+        },
+        {
+            urls: "turn:openrelay.metered.ca:443",
+            username: "openrelayproject",
+            credential: "openrelayproject"
+        },
+        {
+            urls: "turn:openrelay.metered.ca:443?transport=tcp",
+            username: "openrelayproject",
+            credential: "openrelayproject"
+        }
+    ],
+    iceCandidatePoolSize: 10,
+}
+
 export const useWebRTC = (roomId: string, userId: string) => {
     const [localStream, setLocalStream] = useState<MediaStream | null>(null)
     const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({})
     const [isScreenSharing, setIsScreenSharing] = useState(false)
     const [screenShareUserId, setScreenShareUserId] = useState<string | null>(null)
 
-    const roomRef = useRef<Room | null>(null)
-    const socketRef = useRef<any>(null)
+    const socketRef = useRef<Socket | null>(null)
+    const peersRef = useRef<Record<string, RTCPeerConnection>>({})
+    const localStreamRef = useRef<MediaStream | null>(null)
+    const pendingCandidates = useRef<Record<string, RTCIceCandidateInit[]>>({})
+
+    // Helper to replace video track across all active WebRTC peers
+    const replaceVideoTrackOnAllPeers = useCallback(async (track?: MediaStreamTrack) => {
+        if (!track) return
+        for (const [peerId, pc] of Object.entries(peersRef.current)) {
+            try {
+                const senders = pc.getSenders()
+                const videoSender = senders.find(s => s.track && s.track.kind === "video")
+                if (videoSender) {
+                    await videoSender.replaceTrack(track)
+                }
+            } catch (err) {
+                console.warn(`[WebRTC] Failed to replace track for peer ${peerId}:`, err)
+            }
+        }
+    }, [])
+
+    const createPeerConnection = useCallback((targetUserId: string, socket: Socket): RTCPeerConnection => {
+        if (peersRef.current[targetUserId]) {
+            return peersRef.current[targetUserId]
+        }
+
+        const pc = new RTCPeerConnection(ICE_CONFIG)
+        peersRef.current[targetUserId] = pc
+
+        // Attach local tracks
+        if (localStreamRef.current) {
+            localStreamRef.current.getTracks().forEach(track => {
+                try {
+                    pc.addTrack(track, localStreamRef.current!)
+                } catch (e) {
+                    console.warn("[WebRTC] Track already added to peer:", e)
+                }
+            })
+        }
+
+        // Send ICE candidate to remote peer via Socket.io
+        pc.onicecandidate = (event) => {
+            if (event.candidate && socket.connected) {
+                socket.emit("ice-candidate", event.candidate, roomId, targetUserId, userId)
+            }
+        }
+
+        // Receive remote audio/video tracks
+        pc.ontrack = (event) => {
+            const stream = event.streams[0] || new MediaStream([event.track])
+            setRemoteStreams(prev => {
+                const existing = prev[targetUserId]
+                if (existing) {
+                    // Avoid creating new MediaStream reference if track already exists
+                    if (!existing.getTracks().some(t => t.id === event.track.id)) {
+                        existing.addTrack(event.track)
+                    }
+                    return { ...prev, [targetUserId]: existing }
+                }
+                return { ...prev, [targetUserId]: stream }
+            })
+        }
+
+        pc.onconnectionstatechange = () => {
+            console.log(`[WebRTC] Peer ${targetUserId} state:`, pc.connectionState)
+            if (pc.connectionState === "disconnected" || pc.connectionState === "failed" || pc.connectionState === "closed") {
+                // Connection dropped
+            }
+        }
+
+        return pc
+    }, [roomId, userId])
 
     useEffect(() => {
         let isMounted = true
-        let currentLocalStream: MediaStream | null = null
+        const socket = io()
+        socketRef.current = socket
 
-        const room = new Room({
-            adaptiveStream: true,
-            dynacast: true,
-        })
-        roomRef.current = room
-
-        // Restore socket.io strictly for AI data signaling (God Mode, alerts, etc.)
-        socketRef.current = io()
-        socketRef.current.emit("join-room", roomId, userId)
-
-        // 1. Start Local Camera immediately upon mount (never wait for LiveKit connection)
-        const initLocalCamera = async () => {
-            const isCompanion = sessionStorage.getItem("meet-companion-mode") === "true";
+        // Initialize local camera
+        const initCamera = async () => {
+            const isCompanion = typeof window !== "undefined" && sessionStorage.getItem("meet-companion-mode") === "true"
             if (isCompanion) {
-                if (isMounted) setLocalStream(new MediaStream());
-                return null;
+                const empty = new MediaStream()
+                localStreamRef.current = empty
+                if (isMounted) setLocalStream(empty)
+                return
             }
+
             try {
-                const stream = await cameraManager.getStream();
-                currentLocalStream = stream;
-                if (isMounted && stream.getTracks().length > 0) {
-                    setLocalStream(stream);
-                }
-                return stream;
-            } catch (err) {
-                console.warn("Direct camera access failed:", err);
-                return null;
-            }
-        };
+                const stream = await cameraManager.getStream()
+                localStreamRef.current = stream
+                if (isMounted) setLocalStream(stream)
 
-        const connectToLiveKit = async () => {
-            try {
-                // Ensure camera is getting initialized
-                const cameraPromise = currentLocalStream ? Promise.resolve(currentLocalStream) : initLocalCamera();
-
-                // Fetch secure JWT Token
-                const tokenRes = await fetch(`/api/livekit/get-token?room=${roomId}&username=${userId}`);
-                if (!tokenRes.ok) throw new Error("Failed to get LiveKit token");
-                const { token } = await tokenRes.json();
-
-                if (!token) throw new Error("Missing LiveKit token");
-
-                // Connect to LiveKit Enterprise Server
-                const livekitUrl = "wss://meet-clone-h7gsuvxw.livekit.cloud";
-                await room.connect(livekitUrl, token);
-
-                const stream = await cameraPromise;
-                if (stream) {
-                    const videoTracks = stream.getVideoTracks();
-                    if (videoTracks.length > 0) {
-                        await room.localParticipant.publishTrack(videoTracks[0]).catch(e => console.warn(e));
-                    }
-                    const audioTracks = stream.getAudioTracks();
-                    if (audioTracks.length > 0) {
-                        await room.localParticipant.publishTrack(audioTracks[0]).catch(e => console.warn(e));
-                    }
-                }
-
-                // 4. Map Remote LiveKit Tracks back into standard MediaStreams for the AI Models
-                const updateRemoteStreams = () => {
-                    const streams: Record<string, MediaStream> = {}
-                    
-                    room.remoteParticipants.forEach((participant) => {
-                        const pStream = new MediaStream()
-                        
-                        participant.videoTrackPublications.forEach((pub) => {
-                            if (pub.track?.mediaStreamTrack && pub.source === Track.Source.Camera) {
-                                pStream.addTrack(pub.track.mediaStreamTrack)
-                            }
-                        })
-                        participant.audioTrackPublications.forEach((pub) => {
-                            if (pub.track?.mediaStreamTrack && pub.source === Track.Source.Microphone) {
-                                pStream.addTrack(pub.track.mediaStreamTrack)
-                            }
-                        })
-                        
-                        if (pStream.getTracks().length > 0) {
-                            streams[participant.identity] = pStream
+                // If peers already connected before camera was ready, attach tracks now
+                for (const pc of Object.values(peersRef.current)) {
+                    stream.getTracks().forEach(track => {
+                        try {
+                            pc.addTrack(track, stream)
+                        } catch (e) {
+                            console.warn(e)
                         }
                     })
-                    if (isMounted) setRemoteStreams(streams)
                 }
-
-                // Listen for LiveKit Events
-                room.on(RoomEvent.TrackSubscribed, updateRemoteStreams)
-                room.on(RoomEvent.TrackUnsubscribed, updateRemoteStreams)
-                room.on(RoomEvent.ParticipantDisconnected, updateRemoteStreams)
-                room.on(RoomEvent.ParticipantConnected, updateRemoteStreams)
-
-                // Handle Screen Share specifically
-                room.on(RoomEvent.TrackSubscribed, (track, pub, participant) => {
-                    if (pub.source === Track.Source.ScreenShare) {
-                        setScreenShareUserId(participant.identity)
-                    }
-                })
-                room.on(RoomEvent.TrackUnsubscribed, (track, pub, participant) => {
-                    if (pub.source === Track.Source.ScreenShare) {
-                        setScreenShareUserId(null)
-                    }
-                })
-
-                updateRemoteStreams()
             } catch (err) {
-                console.error("LiveKit SFU connection failed:", err)
+                console.warn("[WebRTC] Direct camera access error:", err)
             }
         }
-        
-        connectToLiveKit()
+
+        initCamera()
+
+        // Socket Join
+        const displayName = (typeof window !== "undefined" ? sessionStorage.getItem("meet-display-name") : null) || "Guest"
+        socket.emit("join-room", roomId, userId, displayName)
+
+        // When a new remote user connects: We are the caller, initiate Offer
+        socket.on("user-connected", async (newUserId: string) => {
+            if (newUserId === userId) return
+            console.log(`[WebRTC] User connected: ${newUserId}, creating offer...`)
+
+            try {
+                const pc = createPeerConnection(newUserId, socket)
+                const offer = await pc.createOffer({
+                    offerToReceiveAudio: true,
+                    offerToReceiveVideo: true
+                })
+                await pc.setLocalDescription(offer)
+                socket.emit("offer", offer, roomId, newUserId, userId)
+            } catch (err) {
+                console.error("[WebRTC] Error creating offer:", err)
+            }
+        })
+
+        // When receiving an offer: We are the callee, create Answer
+        socket.on("offer", async (offer: any, targetId: string, senderId: string) => {
+            if (targetId !== userId) return
+            console.log(`[WebRTC] Received offer from ${senderId}`)
+
+            try {
+                const pc = createPeerConnection(senderId, socket)
+                await pc.setRemoteDescription(new RTCSessionDescription(offer))
+
+                // Apply any queued candidates
+                if (pendingCandidates.current[senderId]) {
+                    for (const cand of pendingCandidates.current[senderId]) {
+                        await pc.addIceCandidate(new RTCIceCandidate(cand)).catch(console.warn)
+                    }
+                    delete pendingCandidates.current[senderId]
+                }
+
+                const answer = await pc.createAnswer()
+                await pc.setLocalDescription(answer)
+                socket.emit("answer", answer, roomId, senderId, userId)
+            } catch (err) {
+                console.error("[WebRTC] Error answering offer:", err)
+            }
+        })
+
+        // When receiving an answer
+        socket.on("answer", async (answer: any, targetId: string, senderId: string) => {
+            if (targetId !== userId) return
+            console.log(`[WebRTC] Received answer from ${senderId}`)
+
+            try {
+                const pc = peersRef.current[senderId]
+                if (pc) {
+                    await pc.setRemoteDescription(new RTCSessionDescription(answer))
+
+                    // Apply any queued candidates
+                    if (pendingCandidates.current[senderId]) {
+                        for (const cand of pendingCandidates.current[senderId]) {
+                            await pc.addIceCandidate(new RTCIceCandidate(cand)).catch(console.warn)
+                        }
+                        delete pendingCandidates.current[senderId]
+                    }
+                }
+            } catch (err) {
+                console.error("[WebRTC] Error setting remote answer:", err)
+            }
+        })
+
+        // When receiving ICE candidate
+        socket.on("ice-candidate", async (candidate: any, targetId: string, senderId: string) => {
+            if (targetId !== userId) return
+
+            try {
+                const pc = peersRef.current[senderId]
+                if (pc && pc.remoteDescription && pc.remoteDescription.type) {
+                    await pc.addIceCandidate(new RTCIceCandidate(candidate))
+                } else {
+                    // Queue candidate until remote description is set
+                    if (!pendingCandidates.current[senderId]) {
+                        pendingCandidates.current[senderId] = []
+                    }
+                    pendingCandidates.current[senderId].push(candidate)
+                }
+            } catch (err) {
+                console.warn("[WebRTC] Error adding ICE candidate:", err)
+            }
+        })
+
+        // User disconnected
+        socket.on("user-disconnected", (leftUserId: string) => {
+            console.log(`[WebRTC] User disconnected: ${leftUserId}`)
+            if (peersRef.current[leftUserId]) {
+                peersRef.current[leftUserId].close()
+                delete peersRef.current[leftUserId]
+            }
+            delete pendingCandidates.current[leftUserId]
+            setRemoteStreams(prev => {
+                const next = { ...prev }
+                delete next[leftUserId]
+                return next
+            })
+        })
+
+        // Screen share events
+        socket.on("screen-share-started", (senderUserId: string) => {
+            setScreenShareUserId(senderUserId)
+        })
+        socket.on("screen-share-stopped", () => {
+            setScreenShareUserId(null)
+        })
 
         return () => {
             isMounted = false
-            room.disconnect()
-            if (socketRef.current) socketRef.current.disconnect()
+            socket.disconnect()
+            for (const pc of Object.values(peersRef.current)) {
+                pc.close()
+            }
+            peersRef.current = {}
         }
-    }, [roomId, userId])
+    }, [roomId, userId, createPeerConnection])
 
     const startScreenShare = useCallback(async () => {
-        if (!roomRef.current) return
         try {
-            await roomRef.current.localParticipant.setScreenShareEnabled(true, { audio: true })
+            const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true })
+            const videoTrack = stream.getVideoTracks()[0]
+            await replaceVideoTrackOnAllPeers(videoTrack)
             setIsScreenSharing(true)
+            if (socketRef.current) socketRef.current.emit("screen-share-started", roomId, userId)
+
+            videoTrack.onended = () => {
+                stopScreenShare()
+            }
         } catch (e) {
-            console.error("Screen share failed", e)
+            console.error("Screen share error:", e)
         }
-    }, [])
+    }, [replaceVideoTrackOnAllPeers, roomId, userId])
 
     const stopScreenShare = useCallback(async () => {
-        if (!roomRef.current) return
-        try {
-            await roomRef.current.localParticipant.setScreenShareEnabled(false)
-            setIsScreenSharing(false)
-        } catch (e) {
-            console.error("Stop screen share failed", e)
+        if (localStreamRef.current) {
+            const videoTrack = localStreamRef.current.getVideoTracks()[0]
+            if (videoTrack) {
+                await replaceVideoTrackOnAllPeers(videoTrack)
+            }
         }
-    }, [])
+        setIsScreenSharing(false)
+        if (socketRef.current) socketRef.current.emit("screen-share-stopped", roomId, userId)
+    }, [replaceVideoTrackOnAllPeers, roomId, userId])
 
     return {
         localStream,
         remoteStreams,
-        socket: socketRef.current, // Restored for AI signaling!
+        socket: socketRef.current,
         isScreenSharing,
         screenShareUserId,
         startScreenShare,
         stopScreenShare,
-        peersRef: { current: {} }, // Stubbed out
-        replaceVideoTrackOnAllPeers: async (track?: MediaStreamTrack) => {}, // LiveKit handles this automatically
+        peersRef,
+        replaceVideoTrackOnAllPeers,
     }
 }

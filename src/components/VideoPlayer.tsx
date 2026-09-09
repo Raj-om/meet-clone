@@ -8,6 +8,7 @@ interface VideoPlayerProps {
     muted?: boolean
     label?: string
     isPinned?: boolean
+    isLocal?: boolean
     deepfakeLabel?: "Real" | "Suspicious" | "Deepfake Detected" | null
     riskScore?: number
     isActiveSpeaker?: boolean
@@ -16,7 +17,7 @@ interface VideoPlayerProps {
 
 const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(
     function VideoPlayer(
-        { stream, muted = false, label = "User", isPinned = false, deepfakeLabel = null, riskScore, isActiveSpeaker = false, networkQuality },
+        { stream, muted = false, label = "User", isPinned = false, isLocal = false, deepfakeLabel = null, riskScore, isActiveSpeaker = false, networkQuality },
         ref
     ) {
         const internalRef = useRef<HTMLVideoElement>(null)
@@ -55,12 +56,18 @@ const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(
                 : deepfakeLabel === "Suspicious" ? "⚠️"
                     : "✅"
 
-        const isHighRisk = (riskScore && riskScore >= 70) || deepfakeLabel === "Deepfake Detected" || deepfakeLabel === "Suspicious"
+        // CRITICAL FIX: Local user looking at their own webcam must NEVER be flagged as high-risk / attacker!
+        // Also: "Suspicious" is an informational warning badge; ONLY confirmed "Deepfake Detected" (or riskScore >= 75) is high risk.
+        const isHighRisk = !isLocal && (
+            (riskScore !== undefined && riskScore >= 75) || 
+            deepfakeLabel === "Deepfake Detected"
+        )
 
         const borderColor =
             isHighRisk ? "#ef4444"
-                : riskScore && riskScore >= 40 ? "#f59e0b"
-                    : "transparent"
+                : !isLocal && deepfakeLabel === "Suspicious" ? "#f59e0b"
+                    : riskScore && riskScore >= 40 ? "#f59e0b"
+                        : "transparent"
 
         return (
             <div

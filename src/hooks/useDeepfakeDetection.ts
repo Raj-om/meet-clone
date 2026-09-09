@@ -145,10 +145,9 @@ export function useDeepfakeDetection({
         }
 
         // Cap the fallback heuristic score to prevent false positive red screens
-        // during live demos when the real ONNX model is missing, unless the MediaPipe
-        // heuristics triggered a high score.
-        if (score > 15 && score < 40) {
-            score = 15 + Math.random() * 5 // Max ~20
+        // on normal webcams, indoor lighting, and users wearing glasses
+        if (score < 65) {
+            score = Math.min(score, 15);
         }
         
         return Math.min(score, 100)
@@ -176,11 +175,23 @@ export function useDeepfakeDetection({
         } catch { return 0 }
     }
 
+    const initTimeRef = useRef<number>(Date.now())
+
     // ── Main analysis frame ─────────────────────────────────────────────────────
     const analyzeFrame = useCallback(async () => {
         const video = videoRef.current
         if (!video || video.readyState < 2) return
         setIsAnalyzing(prev => prev ? prev : true)
+
+        // 8-second warm-up calibration grace period on camera start to let auto-exposure & natural blinks settle
+        const elapsedSec = (Date.now() - initTimeRef.current) / 1000;
+        if (elapsedSec < 8) {
+            setLabel("Real");
+            setConfidence(0);
+            updateScore("deepfake", 0);
+            setIsAnalyzing(false);
+            return;
+        }
 
         if (!canvasRef.current) canvasRef.current = document.createElement("canvas")
         const canvas = canvasRef.current
@@ -199,8 +210,8 @@ export function useDeepfakeDetection({
         }
 
         const newLabel: DeepfakeLabel =
-            score >= 60 ? "Deepfake Detected"
-                : score >= 30 ? "Suspicious"
+            score >= 75 ? "Deepfake Detected"
+                : score >= 45 ? "Suspicious"
                     : "Real"
 
         if (process.env.NODE_ENV !== "test") {
