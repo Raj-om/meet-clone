@@ -36,7 +36,7 @@ export const useWebRTC = (roomId: string, userId: string) => {
     const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({})
     const [isScreenSharing, setIsScreenSharing] = useState(false)
     const [screenShareUserId, setScreenShareUserId] = useState<string | null>(null)
-
+    const [socket, setSocket] = useState<Socket | null>(null)
     const socketRef = useRef<Socket | null>(null)
     const peersRef = useRef<Record<string, RTCPeerConnection>>({})
     const localStreamRef = useRef<MediaStream | null>(null)
@@ -136,6 +136,7 @@ export const useWebRTC = (roomId: string, userId: string) => {
         let isMounted = true
         const socket = io()
         socketRef.current = socket
+        setSocket(socket)
 
         // Ensure camera & microphone are active BEFORE joining room so tracks are attached to the initial offer/answer
         const startSession = async () => {
@@ -333,7 +334,7 @@ export const useWebRTC = (roomId: string, userId: string) => {
     return {
         localStream,
         remoteStreams,
-        socket: socketRef.current,
+        socket: socket || socketRef.current,
         isScreenSharing,
         screenShareUserId,
         startScreenShare,

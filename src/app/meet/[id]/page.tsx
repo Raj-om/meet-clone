@@ -646,12 +646,36 @@ export default function MeetingPage({ params }: { params: Promise<{ id: string }
         
         socket.on("mode-select", (mode: any) => setRoomMode(mode))
         socket.on("caption", handleRemoteCaption)
+
+        // When a new user connects, re-broadcast the active roomMode if we are host
+        const handleNewUser = () => {
+            if (isHost && roomMode) {
+                socket.emit("mode-select", roomMode);
+            }
+        };
+        socket.on("user-connected", handleNewUser);
+
+        // If host already picked a mode, sync immediately
+        if (isHost && roomMode) {
+            socket.emit("mode-select", roomMode);
+        }
         
         return () => { 
             socket.off("mode-select")
-            socket.off("caption", handleRemoteCaption) 
+            socket.off("caption", handleRemoteCaption)
+            socket.off("user-connected", handleNewUser)
         }
-    }, [socket, userId])
+    }, [socket, userId, isHost, roomMode])
+
+    // Non-host auto-join fallback: ensure no friend is stuck if host is already in the room
+    useEffect(() => {
+        if (!isHost && roomMode === null) {
+            const timer = setTimeout(() => {
+                setRoomMode(prev => prev || 'office')
+            }, 4000)
+            return () => clearTimeout(timer)
+        }
+    }, [isHost, roomMode])
 
     if (roomMode === null) {
         return <ModeSelectionScreen 

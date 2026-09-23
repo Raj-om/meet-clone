@@ -261,12 +261,29 @@ const ModeCard: React.FC<ModeCardProps> = ({ config, selected, isHost, hostSelec
   );
 };
 
-const ParticipantWaiting: React.FC = () => {
+const ParticipantWaiting: React.FC<{ onSkip: () => void }> = ({ onSkip }) => {
   const [dots, setDots] = useState(".");
+  const [countdown, setCountdown] = useState(5);
+
   useEffect(() => {
     const iv = setInterval(() => setDots((d) => (d.length >= 3 ? "." : d + ".")), 500);
     return () => clearInterval(iv);
   }, []);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          onSkip();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [onSkip]);
+
   return (
     <div
       style={{
@@ -276,11 +293,13 @@ const ParticipantWaiting: React.FC = () => {
         gap: "16px",
         padding: "40px 48px",
         borderRadius: "20px",
-        background: "rgba(14,14,24,0.6)",
+        background: "rgba(14,14,24,0.75)",
         backdropFilter: "blur(20px)",
         WebkitBackdropFilter: "blur(20px)",
-        border: "1px solid rgba(255,255,255,0.08)",
-        boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+        border: "1px solid rgba(99,102,241,0.25)",
+        boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
+        textAlign: "center" as const,
+        maxWidth: "420px",
       }}
     >
       <div
@@ -296,9 +315,36 @@ const ParticipantWaiting: React.FC = () => {
       <div style={{ fontSize: "16px", fontWeight: 600, color: "#e2e8f0", letterSpacing: "-0.2px" }}>
         Waiting for host to select session mode{dots}
       </div>
-      <div style={{ fontSize: "12.5px", color: "rgba(148,163,184,0.7)", textAlign: "center" as const, maxWidth: "340px", lineHeight: 1.6 }}>
-        Your host is choosing the session type. The room will configure automatically once they proceed.
+      <div style={{ fontSize: "12.5px", color: "rgba(148,163,184,0.8)", maxWidth: "340px", lineHeight: 1.6 }}>
+        Your host is in the meeting. Auto-entering room in <span style={{ color: "#a5b4fc", fontWeight: 700 }}>{countdown}s</span>...
       </div>
+      <button
+        onClick={onSkip}
+        style={{
+          marginTop: "8px",
+          padding: "11px 32px",
+          borderRadius: "12px",
+          background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
+          color: "#ffffff",
+          border: "none",
+          fontSize: "14px",
+          fontWeight: 700,
+          cursor: "pointer",
+          boxShadow: "0 4px 25px rgba(99,102,241,0.5)",
+          transition: "transform 0.2s ease, box-shadow 0.2s ease",
+          letterSpacing: "0.2px",
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = "scale(1.04)";
+          e.currentTarget.style.boxShadow = "0 6px 30px rgba(99,102,241,0.7)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = "scale(1)";
+          e.currentTarget.style.boxShadow = "0 4px 25px rgba(99,102,241,0.5)";
+        }}
+      >
+        Join Meeting Now →
+      </button>
     </div>
   );
 };
@@ -432,7 +478,7 @@ const ModeSelectionScreen: React.FC<Props> = ({ meetingId, displayName, isHost, 
 
           {/* Main area */}
           {!isHost && hostSelectedMode === null ? (
-            <ParticipantWaiting />
+            <ParticipantWaiting onSkip={onSkip} />
           ) : (
             <>
               {isHost && (

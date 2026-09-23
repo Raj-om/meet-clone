@@ -258,6 +258,10 @@ app.prepare().then(() => {
             socket.emit("host-confirmed", { isHost, hostUserId: roomHosts[roomId] });
             if (roomModes[roomId]) {
                 socket.emit("mode-select", roomModes[roomId]);
+            } else if (roomParticipants[roomId] && roomParticipants[roomId].size > 1) {
+                // Host is already in the room; sync mode immediately so guest never hangs on waiting screen
+                roomModes[roomId] = 'office';
+                socket.emit("mode-select", 'office');
             }
 
             socket.to(roomId).emit("user-connected", userId);
